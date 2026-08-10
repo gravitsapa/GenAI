@@ -17,6 +17,7 @@ dist/
 
 # Project data
 /data/
+/experiments/
 
 # VS code
 .vscode/
