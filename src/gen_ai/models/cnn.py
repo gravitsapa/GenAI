@@ -180,6 +180,73 @@ class Encoder(nn.Module):
         return output_tensor
 
 
+class Decoder(nn.Module):
+    def __init__(
+        self,
+        in_channels: int=3,
+        out_channels: int=3,
+        block_channels: tuple[int, ...]=(64,),
+        norm_num_groups: int=8,
+        activation_fn: ModuleFactory=nn.SiLU,
+        mid_layers: int=2,
+    ):
+        super().__init__()
+
+        self.conv_in = conv3x3(
+            in_channels,
+            block_channels[-1]
+        )
+
+        last_channels = block_channels[-1]
+
+        self.mid_blocks = nn.Sequential()
+        for block_num in range(mid_layers):
+            self.mid_blocks.append(ResNetBlock2D(
+                in_channels=last_channels,
+                out_channels=last_channels,
+                res_change=ResChange.IDENTIAL,
+                non_linearity=activation_fn,
+                normalization=GroupNormalizationFactory(norm_num_groups),
+            ))
+
+        self.up_blocks = nn.Sequential()
+
+        for block_num, channels in enumerate(reversed(block_channels)):
+            block_in_channels = last_channels
+            block_out_channels = channels
+
+            last_channels = block_out_channels
+            is_last_block = block_num == len(block_channels) - 1
+
+            up_block = ResNetBlock2D(
+                block_in_channels,
+                block_out_channels,
+                ResChange.IDENTIAL if is_last_block else ResChange.UP,
+                non_linearity=activation_fn,
+                normalization=GroupNormalizationFactory(norm_num_groups),
+            )
+
+            self.up_blocks.append(up_block)
+
+        self.conv_norm_out = GroupNormalizationFactory(norm_num_groups)(last_channels)
+        self.conv_act = activation_fn()
+
+        self.conv_out = conv3x3(last_channels, out_channels)
+
+    def forward(self, input_tensor: Tensor) -> Tensor:
+        hidden = input_tensor
+
+        hidden = self.conv_in(hidden)
+        hidden = self.mid_blocks(hidden)
+        hidden = self.up_blocks(hidden)
+
+        hidden = self.conv_norm_out(hidden)
+        hidden = self.conv_act(hidden)
+        ouput_tensor = self.conv_out(hidden)
+
+        return ouput_tensor
+        
+
 # Sources:
 # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
 # https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/autoencoders/vae.py
