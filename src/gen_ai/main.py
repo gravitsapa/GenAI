@@ -21,15 +21,15 @@ def main():
         32,
         shuffle=True,
         pin_memory=True,
-        num_workers=6,
+        num_workers=2,
     )
 
     print("Loaded dataset")
 
     vae = VAE(
         8,
-        (16, 32, 64, 128),
-        norm_num_groups=4,
+        (64, 128, 256, 512),
+        norm_num_groups=32,
     ).to(device)
 
     num_epochs = 200

@@ -51,6 +51,8 @@ class VAE(nn.Module):
             norm_num_groups=norm_num_groups,
         )
 
+        self.head = nn.Tanh()
+
 
     def forward(self, input_tensor: Tensor) -> VAEResult:
         encoder_output = self.encoder(input_tensor)
@@ -61,14 +63,16 @@ class VAE(nn.Module):
         eps = torch.randn_like(mu)
         latent = mu + std * eps
 
-        output_tensor = self.decoder(latent)
+        decoder_output = self.decoder(latent)
+        output_tensor = self.head(decoder_output)
 
         return VAEResult(encoder_output, output_tensor)
 
 
     @torch.inference_mode()
     def sample(self, latent: Tensor) -> Tensor:
-        output_tensor = self.decoder(latent)
+        decoder_output = self.decoder(latent)
+        output_tensor = self.head(decoder_output)
         return output_tensor
 
 
@@ -85,17 +89,17 @@ class VAELoss(nn.Module):
         reconstruction_loss = F.mse_loss(
             input_tensor,
             vae_result.output_tensor,
-            reduction="sum",
-        )
+            reduction="none",
+        ).flatten(1).sum(dim=1)
 
         mu, log_var = split_channels_on_2_parts(vae_result.encoder_output)
         var = torch.exp(log_var)
 
-        kl_divergence = 0.5 * torch.sum(
+        kl_divergence = 0.5 * (
             mu.square() + var - 1 - log_var
-        )
+        ).flatten(1).sum(dim=1)
 
-        return reconstruction_loss + self.beta * kl_divergence
+        return (reconstruction_loss + self.beta * kl_divergence).mean()
 
 
     
