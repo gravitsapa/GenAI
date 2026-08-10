@@ -8,6 +8,7 @@ class ImageSample(NamedTuple):
     tags: str
 
 def show_sample(image_sample: ImageSample, ax: Axes):
-    ax.imshow(image_sample.image.cpu().permute(1, 2, 0))
+    image = image_sample.image.detach().cpu().permute(1, 2, 0)
+    ax.imshow(image)
     ax.axis("off")
 

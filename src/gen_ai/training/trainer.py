@@ -47,7 +47,7 @@ class Trainer:
 
             self.optimizer.step()
 
-            loss_sum += float(loss)
+            loss_sum += float(loss.detach().cpu())
             loss_cnt += 1
 
         return loss_sum / loss_cnt

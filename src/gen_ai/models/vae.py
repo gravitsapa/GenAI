@@ -56,7 +56,7 @@ class VAE(nn.Module):
         encoder_output = self.encoder(input_tensor)
 
         mu, log_var = split_channels_on_2_parts(encoder_output)
-        std = torch.exp(log_var).sqrt()
+        std = torch.exp(0.5 * log_var)
 
         eps = torch.randn_like(mu)
         latent = mu + std * eps

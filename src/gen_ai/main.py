@@ -21,7 +21,7 @@ def main():
         32,
         shuffle=True,
         pin_memory=True,
-        num_workers=8,
+        num_workers=6,
     )
 
     print("Loaded dataset")
@@ -32,7 +32,7 @@ def main():
         norm_num_groups=4,
     ).to(device)
 
-    num_epochs = 1000
+    num_epochs = 200
 
     optimizer = torch.optim.Adam(
         vae.parameters(),
