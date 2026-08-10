@@ -83,6 +83,11 @@ class ResNetBlock2D(nn.Module):
             self.resample_hidden = nn.Identity()
             self.resample_input = nn.Identity()
 
+        self.conv_shortcut = conv1x1(
+            in_channels,
+            out_channels
+        )
+
         self.conv1 = conv3x3(in_channels, out_channels)
         self.norm2 = normalization_out(out_channels)
         self.dropout = nn.Dropout(dropout)
@@ -93,19 +98,22 @@ class ResNetBlock2D(nn.Module):
 
     def forward(self, input_tensor: Tensor) -> Tensor:
         hidden = input_tensor
+        skip_connection = input_tensor
 
         hidden = self.norm1(hidden)
         hidden = self.nonlinearity1(hidden)
         hidden = self.resample_hidden(hidden)
-        input_tensor = self.resample_input(input_tensor)
+        skip_connection = self.resample_input(skip_connection)
         hidden = self.conv1(hidden)
 
         hidden = self.norm2(hidden)
-        hidden = self.nonlinearity2()
+        hidden = self.nonlinearity2(hidden)
         hidden = self.dropout(hidden)
         hidden = self.conv2(hidden)
 
-        output_tensor = input_tensor + hidden
+        skip_connection = self.conv_shortcut(skip_connection)
+
+        output_tensor = skip_connection + hidden
 
         return output_tensor
 

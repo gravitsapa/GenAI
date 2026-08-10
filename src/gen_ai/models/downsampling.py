@@ -15,6 +15,7 @@ class Downsample2D(nn.Module):
         padding: int=1,
         bias: bool=True
     ):
+        super().__init__()
         self.channels = channels
         self.out_channels = channels if out_channels is None else out_channels
 

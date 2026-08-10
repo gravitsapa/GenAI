@@ -9,6 +9,7 @@ class Upsample2D(nn.Module):
         self, 
         channels: int,
     ):
+        super().__init__()
         self.channels = channels
 
     def forward(self, input_tensor: Tensor) -> Tensor:

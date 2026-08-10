@@ -42,7 +42,7 @@ class AnimeFaces256(ImageDataset):
     def __init__(self, height: int, width: int, data_dir: Path=DATA_DIR):
         super().__init__(height, width)
 
-        self.dataset_dir = DATA_DIR / "anime_faces_256"
+        self.dataset_dir = data_dir / "anime_faces_256"
 
         self.data = load_dataset(
             "puruchinera/anime-faces-256",
@@ -55,7 +55,7 @@ class AnimeFaces256(ImageDataset):
     def __getitem__(self, index):
         pil_image = self.data['train'][index]['image']
         return ImageSample(
-            image = self.tensor_from_pil(pil_image),
-            tags = self.data['train'][index]['tags'],
+            image=self.tensor_from_pil(pil_image),
+            tags=self.data['train'][index]['tags'],
         )
 

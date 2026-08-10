@@ -1,14 +1,13 @@
+from typing import NamedTuple
 
-from dataclasses import dataclass, field
 from torch import Tensor
 from matplotlib.axes import Axes
 
-@dataclass
-class ImageSample:
+class ImageSample(NamedTuple):
     image: Tensor
-    tags: str = field(default="")
+    tags: str
 
 def show_sample(image_sample: ImageSample, ax: Axes):
-    ax.imshow(image_sample.image.permute(1, 2, 0))
+    ax.imshow(image_sample.image.cpu().permute(1, 2, 0))
     ax.axis("off")
 

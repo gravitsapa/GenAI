@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from tqdm.auto import tqdm, trange
 
 from gen_ai.config import EXPERIMENTS_DIR
+from gen_ai.models.common import get_model_device
 
 class Trainer:
     def __init__(
@@ -33,8 +34,10 @@ class Trainer:
         loss_sum: float = 0.0
         loss_cnt: int = 0
 
+        device = get_model_device(self.model)
+
         for sample in tqdm(self.data_loader, desc="Batch", leave=False):
-            image = sample.image
+            image = sample.image.to(device)
 
             self.optimizer.zero_grad()
 
@@ -56,8 +59,10 @@ class Trainer:
         scheduler: LRScheduler,
     ) -> list[float]:
         experiment_dir = self.experiments_dir / self.experiment_name
-        if self.experiments_dir.exists():
-            raise RuntimeError("Experiment folder already exist")
+        # if experiment_dir.exists():
+        #     raise RuntimeError("Experiment folder already exist")
+
+        experiment_dir.mkdir(parents=True, exist_ok=True)
         
         loss_history: list[float] = []
 

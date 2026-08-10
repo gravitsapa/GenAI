@@ -7,9 +7,20 @@ from dataclasses import dataclass
 from gen_ai.models.cnn import Encoder, Decoder
 
 
+def split_channels_on_2_parts(tensor: Tensor) -> tuple[Tensor, Tensor]:
+    channels_x2 = int(tensor.shape[1])
+    assert channels_x2 % 2 == 0
+    channels = channels_x2 // 2
+
+    left = tensor[:, :channels, :, :]
+    right = tensor[:, channels:, :, :]
+
+    return left, right
+
+
 @dataclass
 class VAEResult:
-    latent: Tensor
+    encoder_output: Tensor
     output_tensor: Tensor
 
 
@@ -29,6 +40,7 @@ class VAE(nn.Module):
             block_channels=block_channels,
             mid_layers=mid_layers,
             norm_num_groups=norm_num_groups,
+            double_output=True
         )
 
         self.decoder = Decoder(
@@ -41,10 +53,17 @@ class VAE(nn.Module):
 
 
     def forward(self, input_tensor: Tensor) -> VAEResult:
-        latent = self.encoder(input_tensor)
+        encoder_output = self.encoder(input_tensor)
+
+        mu, log_var = split_channels_on_2_parts(encoder_output)
+        std = torch.exp(log_var).sqrt()
+
+        eps = torch.randn_like(mu)
+        latent = mu + std * eps
+
         output_tensor = self.decoder(latent)
 
-        return VAEResult(latent, output_tensor)
+        return VAEResult(encoder_output, output_tensor)
 
 
     @torch.inference_mode()
@@ -69,15 +88,11 @@ class VAELoss(nn.Module):
             reduction="sum",
         )
 
-        latent_channels_x2 = int(vae_result.latent.shape[1])
-        assert latent_channels_x2 % 2 == 0
-        latent_channels = latent_channels_x2 // 2
-
-        mu = vae_result.latent[:, :latent_channels, :, :]
-        var = vae_result.latent[:, latent_channels:, :, :]
+        mu, log_var = split_channels_on_2_parts(vae_result.encoder_output)
+        var = torch.exp(log_var)
 
         kl_divergence = 0.5 * torch.sum(
-            mu.square() + var - 1 - torch.log(var)
+            mu.square() + var - 1 - log_var
         )
 
         return reconstruction_loss + self.beta * kl_divergence
