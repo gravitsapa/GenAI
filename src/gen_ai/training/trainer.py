@@ -16,6 +16,7 @@ from gen_ai.training.scheduler import DescribedScheduler
 from gen_ai.models.common import get_model_device
 from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.training.logger import Logger
+from gen_ai.training.metrics import WeightedMeanMetrics
 
 
 @dataclass
@@ -45,9 +46,8 @@ class Trainer(DeclarationDescribed):
         self.config = config
 
 
-    def _train_one_epoch(self) -> float:
-        loss_sum: float = 0.0
-        loss_cnt: int = 0
+    def _train_one_epoch(self) -> dict[str, float]:
+        metrics_accumulator = WeightedMeanMetrics()
 
         device = get_model_device(self.model)
 
@@ -57,15 +57,20 @@ class Trainer(DeclarationDescribed):
             self.optimizer.zero_grad()
 
             model_output = self.model(image)
-            loss = self.loss_function(image, model_output)
+            loss, batch_loss_metrics = self.loss_function(image, model_output)
+
             loss.backward()
 
             self.optimizer.step()
 
-            loss_sum += float(loss.detach().cpu())
-            loss_cnt += 1
+            metric_values = dict(batch_loss_metrics.to_dict())
+            if "loss" in metric_values:
+                raise ValueError('"loss" is reserved for the optimized loss tensor')
 
-        return loss_sum / loss_cnt
+            metric_values["loss"] = loss.detach().item()
+            metrics_accumulator.update(metric_values, batch_size=image.shape[0])
+
+        return metrics_accumulator.compute()
 
 
     def _collect_config(self) -> dict:
@@ -83,10 +88,16 @@ class Trainer(DeclarationDescribed):
     def _collect_metrics(
         self,
         epoch_num: int,
-        loss: float,
+        loss_metrics: dict[str, float],
     ) -> dict:
-        metrics = {}
-        metrics['']
+        return {
+            "epoch": epoch_num,
+            "learning_rates": [
+                parameter_group["lr"]
+                for parameter_group in self.optimizer.param_groups
+            ],
+            **loss_metrics,
+        }
 
 
     def train_loop(
@@ -98,11 +109,14 @@ class Trainer(DeclarationDescribed):
 
         self.model.train()
         for epoch_num in trange(1, self.config.num_epochs + 1, desc="Epoch"):
-            loss = self._train_one_epoch()
+            epoch_metrics = self._train_one_epoch()
+            loss = epoch_metrics["loss"]
 
             loss_history.append(loss)
 
-            print(f"Epoch {epoch_num}. Loss = {loss:.6f}")
+            self.logger.log_metrics(
+                self._collect_metrics(epoch_num, epoch_metrics)
+            )
 
             # weights_filename = experiment_dir / f"weights_epoch_{epoch_num}.pth"
             # torch.save(self.model.state_dict(), weights_filename)

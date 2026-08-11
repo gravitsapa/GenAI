@@ -268,7 +268,9 @@ class VAE(DescribedImageGenerativeModel):
 class VAELossData:
     reconstruction_loss: float
     kl_divergence: float
-    total_loss: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
 
 
 class VAELoss(nn.Module):
@@ -299,12 +301,11 @@ class VAELoss(nn.Module):
         return (
             loss,
             VAELossData(
-                float(reconstruction_loss),
-                float(kl_divergence),
-                float(loss),
+                reconstruction_loss=reconstruction_loss.detach().mean().item(),
+                kl_divergence=kl_divergence.detach().mean().item(),
             ),
         )
-    
+
 # Sources:
 # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
 # https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/autoencoders/vae.py

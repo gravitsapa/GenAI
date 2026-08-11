@@ -47,7 +47,7 @@ class Logger:
     ):
         metrics_filename = self.experiment_dir / f"{self.metrics_name}.jsonl"
 
-        with open(metrics_filename, "w", encoding="utf-8") as metrics_file:
+        with open(metrics_filename, "a", encoding="utf-8") as metrics_file:
             metrics_file.write(json.dumps(metrics, default=json_default, ensure_ascii=False) + "\n")
 
 

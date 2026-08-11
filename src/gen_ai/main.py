@@ -24,7 +24,7 @@ def main():
     data_loader = DescribedImageDataLoader(
         anime_faces,
         DataloaderConfig(
-            batch_size=32,
+            batch_size=128,
             shuffle=True,
             pin_memory=True,
             num_workers=2,
@@ -37,8 +37,8 @@ def main():
         image_shape=image_shape,
         image_channels=3,
         hidden_channels=8,
-        block_channels=(64, 128, 256, 512),
-        norm_num_groups=32,
+        block_channels=(8, 16, 32, 64),
+        norm_num_groups=4,
         mid_layers=2
     )).to(device)
 
