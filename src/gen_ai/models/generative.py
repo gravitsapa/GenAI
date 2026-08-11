@@ -7,7 +7,7 @@ from torch import Tensor
 from gen_ai.metadata.collectors import DeclarationDescribed, RuntimeDescribed
 
 
-class ImageGenerativeModel(ABC, nn.Module):
+class ImageGenerativeModel(nn.Module, ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

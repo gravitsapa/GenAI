@@ -20,6 +20,6 @@ class DescribedImageDataLoader(DataLoader, DeclarationDescribed):
 
         self.config = config
 
-    def get_declaration_metadata(self) -> DeclarationMetadata:
+    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
         return DeclarationMetadata(asdict(self.config))
 

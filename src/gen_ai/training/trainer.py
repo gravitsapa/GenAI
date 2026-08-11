@@ -5,37 +5,38 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.optim.optimizer import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
 from tqdm.auto import tqdm, trange
 
 from gen_ai.metadata.collectors import DeclarationMetadata, DeclarationDescribed
 
-from gen_ai.project_config import EXPERIMENTS_DIR
+from gen_ai.data.dataloader import DescribedImageDataLoader
+from gen_ai.data.datasets import DescribedImageDataset
+from gen_ai.training.optimizer import DescribedOptimizer
+from gen_ai.training.scheduler import DescribedScheduler
 from gen_ai.models.common import get_model_device
-from gen_ai.models.generative import ImageGenerativeModel
+from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.training.logger import Logger
 
 
 @dataclass
 class TrainerConfig:
     num_epochs: int
-    experiment_name: str
 
 
 class Trainer(DeclarationDescribed):
     def __init__(
         self,
-        model: ImageGenerativeModel,
-        data_loader: DataLoader,
+        model: DescribedImageGenerativeModel,
+        dataset: DescribedImageDataset,
+        data_loader: DescribedImageDataLoader,
         loss_function: nn.Module,
-        optimizer: Optimizer,
+        optimizer: DescribedOptimizer,
         logger: Logger,
-        scheduler: LRScheduler,
+        scheduler: DescribedScheduler,
         config: TrainerConfig,
     ):
         self.model = model
+        self.dataset = dataset
         self.data_loader = data_loader
         self.loss_function = loss_function
         self.optimizer = optimizer
@@ -67,9 +68,23 @@ class Trainer(DeclarationDescribed):
         return loss_sum / loss_cnt
 
 
+    def _collect_config(self) -> dict:
+        experiment_config = {}
+        experiment_config['model_config'] = self.model.get_declaration_metadata_dict()
+        experiment_config['dataset_config'] = self.dataset.get_declaration_metadata_dict()
+        experiment_config['dataloader_config'] = self.data_loader.get_declaration_metadata_dict()
+        experiment_config['optimizer_config'] = self.optimizer.get_declaration_metadata_dict()
+        experiment_config['scheduler_config'] = self.scheduler.get_declaration_metadata_dict()
+        experiment_config['trainer_config'] = self.get_declaration_metadata_dict()
+
+        return experiment_config
+
+
     def train_loop(
         self,
     ) -> list[float]:
+        self.logger.log_config(self._collect_config())
+        
         loss_history: list[float] = []
 
         self.model.train()
@@ -87,5 +102,5 @@ class Trainer(DeclarationDescribed):
 
         return loss_history
 
-    def get_declaration_metadata(self) -> DeclarationMetadata:
+    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
         return DeclarationMetadata(asdict(self.config))

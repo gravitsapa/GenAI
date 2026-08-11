@@ -58,17 +58,19 @@ def main():
         ),
     )
 
+    logger = Logger("second_attempt")
+
     trainer = Trainer(
         vae,
+        anime_faces,
         data_loader,
         VAELoss(),
         optimizer,
-        None,
+        logger,
         scheduler,
         TrainerConfig(
             num_epochs=num_epochs,
-            experiment_name="second_attempt"
-        )
+        ),
     )
 
     trainer.train_loop()

@@ -1,17 +1,12 @@
 from typing import Optional
 
 from pathlib import Path
+from datetime import datetime
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.optim.optimizer import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from tqdm.auto import tqdm, trange
+import json
 
+from gen_ai.util.json_helpers import json_default
 from gen_ai.project_config import EXPERIMENTS_DIR
-from gen_ai.models.common import get_model_device
-from gen_ai.models.generative import ImageGenerativeModel
 
 class Logger:
     def __init__(
@@ -20,16 +15,18 @@ class Logger:
         experiments_dir: Path = EXPERIMENTS_DIR,
     ):
         self.experiment_name = experiment_name
-        self.experiments_dir = experiments_dir
+        self.start_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        self.experiment_name_full_name = f"{self.experiment_name}_{self.start_time}"
+        self.all_experiments_dir = experiments_dir
         
-        experiment_dir = self.experiments_dir / self.experiment_name
-        # if experiment_dir.exists():
-        #     raise RuntimeError("Experiment folder already exist")
-
-        experiment_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_dir = self.all_experiments_dir / self.experiment_name_full_name
+        self.experiment_dir.mkdir(parents=True, exist_ok=True)
 
     def log_config(
         self,
-        
+        config: dict
     ):
-        pass
+        config_filename = self.experiment_dir / "config.json"
+
+        with open(config_filename, "w", encoding="utf-8") as config_file:
+            json.dump(config, config_file, indent=4, default=json_default)
