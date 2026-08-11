@@ -10,6 +10,8 @@ from gen_ai.models.common import ModuleFactory, get_model_device
 from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
 from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
 
+from gen_ai.models.generative import ImageGenerativeModel
+
 
 class Encoder(nn.Module):
     def __init__(
@@ -165,19 +167,21 @@ class VAEResult:
     output_tensor: Tensor
 
 
-class VAE(nn.Module):
+class VAE(ImageGenerativeModel):
     def __init__(
         self,
-        hidden_channels: int=3,
+        image_shape: tuple[int, int],
         image_channels: int=3,
+        hidden_channels: int=3,
         block_channels: tuple[int, ...]=(64,),
         mid_layers: int=2,
         norm_num_groups: int=8,
     ):
         super().__init__()
 
-        self.hidden_channels = hidden_channels
+        self.image_shape = image_shape
         self.image_channels = image_channels
+        self.hidden_channels = hidden_channels
         self.block_channels = block_channels
         self.mid_layers = mid_layers
         self.norm_num_groups = norm_num_groups
@@ -246,8 +250,8 @@ class VAE(nn.Module):
         return VAEResult(encoder_output, output_tensor)
 
 
-    def sample(self, batch_size: int, image_shape: tuple[int, int]) -> Tensor:
-        latent = self._gen_latent(batch_size, image_shape)
+    def sample(self, batch_size: int) -> Tensor:
+        latent = self._gen_latent(batch_size, self.image_shape)
 
         output_tensor = self._sample_by_latent(latent)
         return output_tensor

@@ -11,11 +11,12 @@ from tqdm.auto import tqdm, trange
 
 from gen_ai.config import EXPERIMENTS_DIR
 from gen_ai.models.common import get_model_device
+from gen_ai.models.generative import ImageGenerativeModel
 
 class Trainer:
     def __init__(
         self,
-        model: nn.Module,
+        model: ImageGenerativeModel,
         data_loader: DataLoader,
         loss_function: nn.Module,
         optimizer: Optimizer,
