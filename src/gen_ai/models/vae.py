@@ -264,6 +264,13 @@ class VAE(DescribedImageGenerativeModel):
         )
 
 
+@dataclass
+class VAELossData:
+    reconstruction_loss: float
+    kl_divergence: float
+    total_loss: float
+
+
 class VAELoss(nn.Module):
     def __init__(self, beta: float=1.0):
         super().__init__()
@@ -273,7 +280,7 @@ class VAELoss(nn.Module):
         self,
         input_tensor: Tensor,
         vae_result: VAEResult,
-    ):
+    ) -> tuple[Tensor, VAELossData]:
         reconstruction_loss = F.mse_loss(
             input_tensor,
             vae_result.output_tensor,
@@ -287,7 +294,16 @@ class VAELoss(nn.Module):
             mu.square() + var - 1 - log_var
         ).flatten(1).sum(dim=1)
 
-        return (reconstruction_loss + self.beta * kl_divergence).mean()
+        loss = (reconstruction_loss + self.beta * kl_divergence).mean()
+
+        return (
+            loss,
+            VAELossData(
+                float(reconstruction_loss),
+                float(kl_divergence),
+                float(loss),
+            ),
+        )
     
 # Sources:
 # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py

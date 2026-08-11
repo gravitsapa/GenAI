@@ -80,6 +80,15 @@ class Trainer(DeclarationDescribed):
         return experiment_config
 
 
+    def _collect_metrics(
+        self,
+        epoch_num: int,
+        loss: float,
+    ) -> dict:
+        metrics = {}
+        metrics['']
+
+
     def train_loop(
         self,
     ) -> list[float]:
