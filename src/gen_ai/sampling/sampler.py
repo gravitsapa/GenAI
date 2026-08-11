@@ -3,6 +3,7 @@ from typing import Optional
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 import torch
 import torch.nn as nn
@@ -22,12 +23,11 @@ class Sampler:
 
     @torch.inference_mode()
     def sample_grid(
-        self, 
-        filename: Optional[Path]=None, 
+        self,
         nrows: int=5, 
         ncols: int=5,
         size_per_image: int=2,
-    ) -> None:
+    ) -> Figure:
         fig, axs = plt.subplots(
             nrows, 
             ncols, 
@@ -43,9 +43,5 @@ class Sampler:
                 index = row * ncols + col
                 show_image(samples[index], axs[row][col])
 
-        if filename is None:
-            plt.show()
-        else:
-            fig.savefig(filename)
-            plt.close(fig)
+        return fig
 

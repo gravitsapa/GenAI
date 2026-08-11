@@ -70,6 +70,7 @@ def main():
         scheduler,
         TrainerConfig(
             num_epochs=num_epochs,
+            log_every_epoch=1
         ),
     )
 

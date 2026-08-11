@@ -17,11 +17,13 @@ from gen_ai.models.common import get_model_device
 from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.training.logger import Logger
 from gen_ai.training.metrics import WeightedMeanMetrics
+from gen_ai.sampling.sampler import Sampler
 
 
 @dataclass
 class TrainerConfig:
     num_epochs: int
+    log_every_epoch: int
 
 
 class Trainer(DeclarationDescribed):
@@ -47,6 +49,8 @@ class Trainer(DeclarationDescribed):
 
 
     def _train_one_epoch(self) -> dict[str, float]:
+        self.model.train()
+
         metrics_accumulator = WeightedMeanMetrics()
 
         device = get_model_device(self.model)
@@ -102,28 +106,51 @@ class Trainer(DeclarationDescribed):
 
     def train_loop(
         self,
-    ) -> list[float]:
+    ) -> list[dict]:
         self.logger.log_config(self._collect_config())
-        
-        loss_history: list[float] = []
+
+        sampler = Sampler(self.model)
+
+        metrics_history: list[dict] = []
 
         self.model.train()
         for epoch_num in trange(1, self.config.num_epochs + 1, desc="Epoch"):
             epoch_metrics = self._train_one_epoch()
-            loss = epoch_metrics["loss"]
 
-            loss_history.append(loss)
+            metrics_history.append(epoch_metrics)
 
             self.logger.log_metrics(
                 self._collect_metrics(epoch_num, epoch_metrics)
             )
 
-            # weights_filename = experiment_dir / f"weights_epoch_{epoch_num}.pth"
-            # torch.save(self.model.state_dict(), weights_filename)
-
             self.scheduler.step()
 
-        return loss_history
+            if epoch_num % self.config.log_every_epoch == 0:
+                self.logger.save_metrics_plot(
+                    metrics_history,
+                    epoch_num,
+                )
+
+                checkpoint = {
+                    "epoch": epoch_num,
+                    "model_state_dict": self.model.state_dict(),
+                    "optimizer_state_dict": self.optimizer.state_dict(),
+                    "scheduler_state_dict": self.scheduler.state_dict(),
+                    "metrics_history": metrics_history,
+                }
+
+                self.logger.save_checkpoint(
+                    checkpoint,
+                    epoch_num,
+                )
+
+                samples_fig = sampler.sample_grid()
+                self.logger.save_samples(
+                    samples_fig,
+                    epoch_num,
+                )
+
+        return metrics_history
 
     def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
         return DeclarationMetadata(asdict(self.config))
