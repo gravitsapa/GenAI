@@ -4,13 +4,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
+from gen_ai.metadata.collectors import DeclarationMetadata
 from gen_ai.models.common import ModuleFactory, get_model_device
 from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
 from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
 
-from gen_ai.models.generative import ImageGenerativeModel
+from gen_ai.models.generative import DescribedImageGenerativeModel
 
 
 class Encoder(nn.Module):
@@ -148,7 +149,7 @@ class Decoder(nn.Module):
         ouput_tensor = self.conv_out(hidden)
 
         return ouput_tensor
-        
+
 
 def split_channels_on_2_parts(tensor: Tensor) -> tuple[Tensor, Tensor]:
     channels_x2 = int(tensor.shape[1])
@@ -161,56 +162,56 @@ def split_channels_on_2_parts(tensor: Tensor) -> tuple[Tensor, Tensor]:
     return left, right
 
 
+@dataclass(frozen=True, kw_only=True)
+class VAEConfig:
+    image_shape: tuple[int, int]
+    image_channels: int = 3
+    hidden_channels: int = 3
+    block_channels: tuple[int, ...] = (64, 128, 256, 512)
+    mid_layers: int = 2
+    norm_num_groups: int = 8
+
+
 @dataclass
 class VAEResult:
     encoder_output: Tensor
     output_tensor: Tensor
 
 
-class VAE(ImageGenerativeModel):
+class VAE(DescribedImageGenerativeModel):
     def __init__(
         self,
-        image_shape: tuple[int, int],
-        image_channels: int=3,
-        hidden_channels: int=3,
-        block_channels: tuple[int, ...]=(64,),
-        mid_layers: int=2,
-        norm_num_groups: int=8,
+        vae_config: VAEConfig
     ):
         super().__init__()
 
-        self.image_shape = image_shape
-        self.image_channels = image_channels
-        self.hidden_channels = hidden_channels
-        self.block_channels = block_channels
-        self.mid_layers = mid_layers
-        self.norm_num_groups = norm_num_groups
+        self.config = vae_config
 
         self.encoder = Encoder(
-            in_channels=image_channels,
-            out_channels=hidden_channels,
-            block_channels=block_channels,
-            mid_layers=mid_layers,
-            norm_num_groups=norm_num_groups,
+            in_channels=self.config.image_channels,
+            out_channels=self.config.hidden_channels,
+            block_channels=self.config.block_channels,
+            mid_layers=self.config.mid_layers,
+            norm_num_groups=self.config.norm_num_groups,
             double_output=True
         )
 
         self.decoder = Decoder(
-            in_channels=hidden_channels,
-            out_channels=image_channels,
-            block_channels=block_channels,
-            mid_layers=mid_layers,
-            norm_num_groups=norm_num_groups,
+            in_channels=self.config.hidden_channels,
+            out_channels=self.config.image_channels,
+            block_channels=self.config.block_channels,
+            mid_layers=self.config.mid_layers,
+            norm_num_groups=self.config.norm_num_groups,
         )
 
         self.head = nn.Tanh()
 
 
     def _get_latent_shape(self, image_shape: tuple[int, int]) -> tuple[int, int, int]:
-        divider = 2 ** (len(self.block_channels) - 1)
+        divider = 2 ** (len(self.config.block_channels) - 1)
 
         assert image_shape[0] % divider == 0 and image_shape[1] % divider == 0
-        return (self.hidden_channels, image_shape[0] // divider, image_shape[1] // divider)
+        return (self.config.hidden_channels, image_shape[0] // divider, image_shape[1] // divider)
 
 
     def _reparametrization(self, mu: Tensor, std: Tensor) -> Tensor:
@@ -251,10 +252,16 @@ class VAE(ImageGenerativeModel):
 
 
     def sample(self, batch_size: int) -> Tensor:
-        latent = self._gen_latent(batch_size, self.image_shape)
+        latent = self._gen_latent(batch_size, self.config.image_shape)
 
         output_tensor = self._sample_by_latent(latent)
         return output_tensor
+
+
+    def get_declaration_metadata(self) -> DeclarationMetadata:
+        return DeclarationMetadata(
+            asdict(self.config)
+        )
 
 
 class VAELoss(nn.Module):

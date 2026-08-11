@@ -47,3 +47,5 @@ class Sampler:
             plt.show()
         else:
             fig.savefig(filename)
+            plt.close(fig)
+
