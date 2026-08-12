@@ -7,6 +7,7 @@ from torch import Tensor
 from dataclasses import dataclass, asdict
 
 from gen_ai.metadata.collectors import DeclarationMetadata
+from gen_ai.data.image import ImageShape
 from gen_ai.models.common import ModuleFactory, get_model_device
 from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
 from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
@@ -164,7 +165,7 @@ def split_channels_on_2_parts(tensor: Tensor) -> tuple[Tensor, Tensor]:
 
 @dataclass(frozen=True, kw_only=True)
 class VAEConfig:
-    image_shape: tuple[int, int]
+    image_shape: ImageShape
     image_channels: int = 3
     hidden_channels: int = 3
     block_channels: tuple[int, ...] = (64, 128, 256, 512)
@@ -207,7 +208,7 @@ class VAE(DescribedImageGenerativeModel):
         self.head = nn.Tanh()
 
 
-    def _get_latent_shape(self, image_shape: tuple[int, int]) -> tuple[int, int, int]:
+    def _get_latent_shape(self, image_shape: ImageShape) -> tuple[int, int, int]:
         divider = 2 ** (len(self.config.block_channels) - 1)
 
         assert image_shape[0] % divider == 0 and image_shape[1] % divider == 0
@@ -221,7 +222,7 @@ class VAE(DescribedImageGenerativeModel):
         return latent
 
 
-    def _gen_latent(self, batch_size: int, image_shape: tuple[int, int]) -> Tensor:
+    def _gen_latent(self, batch_size: int, image_shape: ImageShape) -> Tensor:
         shape = (batch_size, ) + self._get_latent_shape(image_shape)
         device = get_model_device(self)
 

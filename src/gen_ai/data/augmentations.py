@@ -4,6 +4,7 @@ from typing import Optional
 import torch
 from torchvision.transforms import v2
 
+from gen_ai.data.image import ImageShape
 from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
 
 
@@ -21,7 +22,7 @@ class AugmentationBuilder(DeclarationDescribed):
         super().__init__()
         self.config = config
 
-    def build(self, image_shape: tuple[int, int]) -> v2.Transform:
+    def build(self, image_shape: ImageShape) -> v2.Transform:
         augmentation_list = []
         if self.config.random_crop_scale is not None:
             scaled_size = tuple(int(size * self.config.random_crop_scale) for size in image_shape)

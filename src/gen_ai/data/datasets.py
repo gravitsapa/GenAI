@@ -14,6 +14,7 @@ from datasets import load_dataset
 from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
 
 from gen_ai.project_config import DATA_DIR
+from gen_ai.data.image import ImageShape
 from gen_ai.data.image_sample import ImageSample
 from gen_ai.data.augmentations import AugmentationBuilder, AugmentationsConfig
 
@@ -21,7 +22,7 @@ from gen_ai.data.augmentations import AugmentationBuilder, AugmentationsConfig
 class ImageDataset(ABC, Dataset):
     def __init__(
         self, 
-        image_shape: tuple[int, int], 
+        image_shape: ImageShape, 
         augmentation_builder: AugmentationBuilder,
     ):
         self.image_shape = image_shape
@@ -60,7 +61,7 @@ class DescribedImageDataset(ImageDataset, DeclarationDescribed):
 
 @dataclass(frozen=True, kw_only=True)
 class ImageDatasetConfig:
-    image_shape: tuple[int, int]
+    image_shape: ImageShape
     data_dir: Path=DATA_DIR
 
 
