@@ -4,6 +4,7 @@ from typing import Optional
 import torch
 from torchvision.transforms import v2
 
+from gen_ai.exceptions import require, ConfigurationError
 from gen_ai.data.image import ImageShape
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
@@ -12,6 +13,19 @@ from gen_ai.metadata.configuration_collector import ContainingConfiguration
 class AugmentationsConfig:
     random_crop_scale: Optional[float] = 1.2
     random_horizontal_flip: Optional[float] = 0.5
+
+    def __post_init__(self) -> None:
+        require(
+            (self.random_crop_scale is None) or (self.random_crop_scale >= 1),
+            ConfigurationError,
+            "random_crop_scale must be >= 1"
+        )
+
+        require(
+            (self.random_horizontal_flip is None) or (0 <= self.random_horizontal_flip <= 1),
+            ConfigurationError,
+            "random_horizontal_flip must be in [0, 1]"
+        )
 
 
 class AugmentationBuilder(ContainingConfiguration):

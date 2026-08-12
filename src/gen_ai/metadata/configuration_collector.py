@@ -2,6 +2,8 @@ from typing import Any, Optional
 
 from dataclasses import is_dataclass, asdict
 
+from gen_ai.exceptions import require
+
 
 def _is_dataclass_instance(obj):
     return is_dataclass(obj) and not isinstance(obj, type)
@@ -12,7 +14,11 @@ class ContainingConfiguration:
         super().__init__(*args, **kwargs)
 
         self.config = config
-        assert self._check_is_config(self.config)
+        require(
+            self._check_is_config(self.config),
+            TypeError,
+            f"Config must be a dataclass",
+        )
 
 
     def _check_is_config(self, config: Any) -> bool:
