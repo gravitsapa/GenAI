@@ -8,7 +8,7 @@ from dataclasses import dataclass, asdict
 
 from gen_ai.data.image import ImageShape
 from gen_ai.models.common import ModuleFactory, get_model_device
-from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
+from gen_ai.models.cnn import conv1x1, conv3x3, ResNetStack2D, ResChange
 from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
 
 from gen_ai.models.generative import DescribedImageGenerativeModel
@@ -23,6 +23,7 @@ class Encoder(nn.Module):
         block_channels: tuple[int, ...]=(64,),
         norm_num_groups: int=8,
         activation_fn: ModuleFactory=nn.SiLU,
+        blocks_in_layer: int = 2,
         mid_layers: int=2,
         double_output: bool=False,
     ):
@@ -43,10 +44,11 @@ class Encoder(nn.Module):
             last_channels = block_out_channels
             is_last_block = block_num == len(block_channels) - 1
 
-            down_block = ResNetBlock2D(
+            down_block = ResNetStack2D(
                 block_in_channels,
                 block_out_channels,
                 ResChange.IDENTIAL if is_last_block else ResChange.DOWN,
+                n_blocks=blocks_in_layer,
                 non_linearity=activation_fn,
                 normalization=GroupNormalizationFactory(norm_num_groups),
             )
@@ -55,10 +57,11 @@ class Encoder(nn.Module):
 
         self.mid_blocks = nn.Sequential()
         for block_num in range(mid_layers):
-            self.mid_blocks.append(ResNetBlock2D(
+            self.mid_blocks.append(ResNetStack2D(
                 in_channels=last_channels,
                 out_channels=last_channels,
                 res_change=ResChange.IDENTIAL,
+                n_blocks=blocks_in_layer,
                 non_linearity=activation_fn,
                 normalization=GroupNormalizationFactory(norm_num_groups),
             ))
@@ -93,6 +96,7 @@ class Decoder(nn.Module):
         block_channels: tuple[int, ...]=(64,),
         norm_num_groups: int=8,
         activation_fn: ModuleFactory=nn.SiLU,
+        blocks_in_layer: int = 2,
         mid_layers: int=2,
     ):
         super().__init__()
@@ -106,10 +110,11 @@ class Decoder(nn.Module):
 
         self.mid_blocks = nn.Sequential()
         for block_num in range(mid_layers):
-            self.mid_blocks.append(ResNetBlock2D(
+            self.mid_blocks.append(ResNetStack2D(
                 in_channels=last_channels,
                 out_channels=last_channels,
                 res_change=ResChange.IDENTIAL,
+                n_blocks=blocks_in_layer,
                 non_linearity=activation_fn,
                 normalization=GroupNormalizationFactory(norm_num_groups),
             ))
@@ -123,10 +128,11 @@ class Decoder(nn.Module):
             last_channels = block_out_channels
             is_last_block = block_num == len(block_channels) - 1
 
-            up_block = ResNetBlock2D(
+            up_block = ResNetStack2D(
                 block_in_channels,
                 block_out_channels,
                 ResChange.IDENTIAL if is_last_block else ResChange.UP,
+                n_blocks=blocks_in_layer,
                 non_linearity=activation_fn,
                 normalization=GroupNormalizationFactory(norm_num_groups),
             )
@@ -178,6 +184,7 @@ class VAEConfig:
     image_channels: int = 3
     hidden_channels: int = 3
     block_channels: tuple[int, ...] = (64, 128, 256, 512)
+    blocks_in_layer: int = 2
     mid_layers: int = 2
     norm_num_groups: int = 8
 
@@ -196,6 +203,11 @@ class VAEConfig:
             len(self.block_channels) > 0 and all(channels > 0 for channels in self.block_channels),
             ConfigurationError,
             "block_channels must contain positive channel counts",
+        )
+        require(
+            self.blocks_in_layer >= 1,
+            ConfigurationError,
+            f"blocks_in_layer must be at least 1, got {self.blocks_in_layer}",
         )
         require(
             self.mid_layers >= 0,
@@ -242,6 +254,7 @@ class VAE(DescribedImageGenerativeModel):
             out_channels=self.config.hidden_channels,
             block_channels=self.config.block_channels,
             mid_layers=self.config.mid_layers,
+            blocks_in_layer=self.config.blocks_in_layer,
             norm_num_groups=self.config.norm_num_groups,
             double_output=True
         )
@@ -251,6 +264,7 @@ class VAE(DescribedImageGenerativeModel):
             out_channels=self.config.image_channels,
             block_channels=self.config.block_channels,
             mid_layers=self.config.mid_layers,
+            blocks_in_layer=self.config.blocks_in_layer,
             norm_num_groups=self.config.norm_num_groups,
         )
 

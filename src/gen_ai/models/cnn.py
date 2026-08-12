@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from gen_ai.exceptions import require
 from gen_ai.models.common import ModuleFactory
 from gen_ai.models.upsampling import Upsample2D
 from gen_ai.models.downsampling import Downsample2D
@@ -116,6 +117,63 @@ class ResNetBlock2D(nn.Module):
         output_tensor = skip_connection + hidden
 
         return output_tensor
+
+
+class ResNetStack2D(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        res_change: ResChange,
+        n_blocks: int=2,
+        dropout: float=0.0,
+        non_linearity: ModuleFactory=nn.SiLU,
+        upsampler: ModuleFactory=Upsample2D,
+        downsampler: ModuleFactory=Downsample2D,
+        normalization: NormalizationFactory=GroupNormalizationFactory(8),
+        normalization_out: Optional[NormalizationFactory]=None,
+    ):
+        super().__init__()
+
+        require(
+            n_blocks >= 1,
+            ValueError,
+            lambda: (
+                "n_blocks must be at least 1, got "
+                f"{n_blocks}"
+            ),
+        )
+
+        self.stack = nn.Sequential()
+        for block_num in range(n_blocks):
+            first_block = block_num == 0
+
+            self.stack.append(
+                ResNetBlock2D(
+                    in_channels=in_channels if first_block else out_channels,
+                    out_channels=out_channels,
+                    res_change=ResChange.IDENTIAL,
+                    dropout=dropout,
+                    non_linearity=non_linearity,
+                    upsampler=upsampler,
+                    downsampler=downsampler,
+                    normalization=normalization,
+                    normalization_out=normalization_out,
+                )
+            )
+
+        if res_change == ResChange.UP:
+            self.stack.append(
+                Upsample2D(out_channels)
+            )
+        elif res_change == ResChange.DOWN:
+            self.stack.append(
+                Downsample2D(out_channels)
+            )
+
+    def forward(self, input_tensor: Tensor) -> Tensor:
+        return self.stack(input_tensor)
+
 
 # Sources:
 # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py

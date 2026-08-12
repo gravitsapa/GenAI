@@ -30,7 +30,7 @@ def main():
     data_loader = DescribedImageDataLoader(
         anime_faces,
         DataloaderConfig(
-            batch_size=48,
+            batch_size=32,
             shuffle=True,
             pin_memory=True,
             num_workers=2,
@@ -65,7 +65,7 @@ def main():
         ),
     )
 
-    logger = Logger("train_vae_waugment")
+    logger = Logger("extended_vae_waugment")
 
     trainer = Trainer(
         vae,
