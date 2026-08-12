@@ -1,5 +1,6 @@
 import torch
 
+from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
 from gen_ai.models.vae import VAE, VAELoss, VAEConfig
@@ -18,16 +19,22 @@ def main():
     image_shape = (64, 64)
     num_epochs=200
 
-    anime_faces = AnimeFaces256(ImageDatasetConfig(
-        image_shape=image_shape
-    ))
+    augmentation_builder = AugmentationBuilder(AugmentationsConfig())
+
+    anime_faces = AnimeFaces256(
+        ImageDatasetConfig(
+            image_shape=image_shape,
+        ),
+        augmentation_builder=augmentation_builder,
+    )
     data_loader = DescribedImageDataLoader(
         anime_faces,
         DataloaderConfig(
-            batch_size=128,
+            batch_size=48,
             shuffle=True,
             pin_memory=True,
             num_workers=2,
+            persistent_workers=True,
         )
     )
 
@@ -36,10 +43,10 @@ def main():
     vae = VAE(VAEConfig(
         image_shape=image_shape,
         image_channels=3,
-        hidden_channels=8,
-        block_channels=(8, 16, 32, 64),
-        norm_num_groups=4,
-        mid_layers=2
+        hidden_channels=4,
+        block_channels=(64, 128, 256, 512),
+        norm_num_groups=32,
+        mid_layers=2,
     )).to(device)
 
 
@@ -58,7 +65,7 @@ def main():
         ),
     )
 
-    logger = Logger("second_attempt")
+    logger = Logger("train_vae_waugment")
 
     trainer = Trainer(
         vae,
@@ -70,7 +77,7 @@ def main():
         scheduler,
         TrainerConfig(
             num_epochs=num_epochs,
-            log_every_epoch=1
+            log_every_epoch=20
         ),
     )
 

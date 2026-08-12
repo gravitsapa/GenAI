@@ -15,13 +15,19 @@ from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
 
 from gen_ai.project_config import DATA_DIR
 from gen_ai.data.image_sample import ImageSample
+from gen_ai.data.augmentations import AugmentationBuilder, AugmentationsConfig
 
 
 class ImageDataset(ABC, Dataset):
-    def __init__(self, image_shape: tuple[int, int]):
+    def __init__(
+        self, 
+        image_shape: tuple[int, int], 
+        augmentation_builder: AugmentationBuilder,
+    ):
         self.image_shape = image_shape
+        self.augmentation_builder = augmentation_builder
 
-        self.cut_transform = v2.Resize(image_shape)
+        self.augmentations = self.augmentation_builder.build(image_shape)
         self.pil_to_tensor_transform = v2.Compose([
             v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
@@ -41,7 +47,7 @@ class ImageDataset(ABC, Dataset):
 
     def tensor_from_pil(self, pil_image: Image) -> Tensor:
         transform = v2.Compose([
-            self.cut_transform,
+            self.augmentations,
             self.pil_to_tensor_transform,
         ])
 
@@ -59,8 +65,15 @@ class ImageDatasetConfig:
 
 
 class AnimeFaces256(DescribedImageDataset):
-    def __init__(self, image_dataset_config: ImageDatasetConfig):
-        super().__init__(image_dataset_config.image_shape)
+    def __init__(
+        self, 
+        image_dataset_config: ImageDatasetConfig,
+        augmentation_builder: AugmentationBuilder,
+    ):
+        super().__init__(
+            image_shape=image_dataset_config.image_shape,
+            augmentation_builder=augmentation_builder,
+        )
 
         self.config = image_dataset_config
 
@@ -85,4 +98,6 @@ class AnimeFaces256(DescribedImageDataset):
 
     
     def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))
+        metadata = asdict(self.config)
+        metadata['augmentations'] = self.augmentation_builder.get_declaration_metadata_dict()
+        return DeclarationMetadata(metadata)

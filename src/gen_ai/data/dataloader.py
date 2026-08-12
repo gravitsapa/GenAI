@@ -12,6 +12,7 @@ class DataloaderConfig:
     shuffle: bool
     pin_memory: bool
     num_workers: int
+    persistent_workers: bool
 
 
 class DescribedImageDataLoader(DataLoader, DeclarationDescribed):
