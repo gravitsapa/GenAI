@@ -12,6 +12,7 @@ from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
 from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
 
 from gen_ai.models.generative import DescribedImageGenerativeModel
+from gen_ai.exceptions import ConfigurationError, ModelShapeError, require
 
 
 class Encoder(nn.Module):
@@ -152,8 +153,17 @@ class Decoder(nn.Module):
 
 
 def split_channels_on_2_parts(tensor: Tensor) -> tuple[Tensor, Tensor]:
+    require(
+        tensor.ndim == 4,
+        ModelShapeError,
+        f"expected a 4D tensor (B, C, H, W), got shape {tuple(tensor.shape)}",
+    )
     channels_x2 = int(tensor.shape[1])
-    assert channels_x2 % 2 == 0
+    require(
+        channels_x2 % 2 == 0,
+        ModelShapeError,
+        f"channel count must be even, got {channels_x2}",
+    )
     channels = channels_x2 // 2
 
     left = tensor[:, :channels, :, :]
@@ -170,6 +180,46 @@ class VAEConfig:
     block_channels: tuple[int, ...] = (64, 128, 256, 512)
     mid_layers: int = 2
     norm_num_groups: int = 8
+
+    def __post_init__(self) -> None:
+        require(
+            len(self.image_shape) == 2 and all(size > 0 for size in self.image_shape),
+            ConfigurationError,
+            f"image_shape must contain two positive dimensions, got {self.image_shape}",
+        )
+        require(
+            self.image_channels > 0 and self.hidden_channels > 0,
+            ConfigurationError,
+            "image_channels and hidden_channels must be positive",
+        )
+        require(
+            len(self.block_channels) > 0 and all(channels > 0 for channels in self.block_channels),
+            ConfigurationError,
+            "block_channels must contain positive channel counts",
+        )
+        require(
+            self.mid_layers >= 0,
+            ConfigurationError,
+            f"mid_layers must be non-negative, got {self.mid_layers}",
+        )
+        require(
+            self.norm_num_groups > 0 and all(
+                channels % self.norm_num_groups == 0
+                for channels in self.block_channels
+            ),
+            ConfigurationError,
+            "norm_num_groups must divide every block channel count",
+        )
+
+        divider = 2 ** (len(self.block_channels) - 1)
+        require(
+            all(size % divider == 0 for size in self.image_shape),
+            ConfigurationError,
+            lambda: (
+                f"image_shape {self.image_shape} must be divisible by "
+                f"the downsampling factor {divider}"
+            ),
+        )
 
 
 @dataclass
@@ -210,7 +260,11 @@ class VAE(DescribedImageGenerativeModel):
     def _get_latent_shape(self, image_shape: ImageShape) -> tuple[int, int, int]:
         divider = 2 ** (len(self.config.block_channels) - 1)
 
-        assert image_shape[0] % divider == 0 and image_shape[1] % divider == 0
+        require(
+            image_shape[0] % divider == 0 and image_shape[1] % divider == 0,
+            ModelShapeError,
+            f"image_shape {image_shape} must be divisible by {divider}",
+        )
         return (self.config.hidden_channels, image_shape[0] // divider, image_shape[1] // divider)
 
 
@@ -238,6 +292,17 @@ class VAE(DescribedImageGenerativeModel):
 
 
     def forward(self, input_tensor: Tensor) -> VAEResult:
+        require(
+            input_tensor.ndim == 4
+            and input_tensor.shape[1] == self.config.image_channels
+            and tuple(input_tensor.shape[-2:]) == self.config.image_shape,
+            ModelShapeError,
+            lambda: (
+                f"expected input shape (B, {self.config.image_channels}, "
+                f"{self.config.image_shape[0]}, {self.config.image_shape[1]}), "
+                f"got {tuple(input_tensor.shape)}"
+            ),
+        )
         encoder_output = self.encoder(input_tensor)
 
         mu, log_var = split_channels_on_2_parts(encoder_output)
@@ -252,6 +317,11 @@ class VAE(DescribedImageGenerativeModel):
 
 
     def sample(self, batch_size: int) -> Tensor:
+        require(
+            batch_size > 0,
+            ValueError,
+            f"batch_size must be positive, got {batch_size}",
+        )
         latent = self._gen_latent(batch_size, self.config.image_shape)
 
         output_tensor = self._sample_by_latent(latent)
@@ -270,6 +340,11 @@ class VAELossData:
 class VAELoss(nn.Module):
     def __init__(self, beta: float=1.0):
         super().__init__()
+        require(
+            beta >= 0,
+            ConfigurationError,
+            f"beta must be non-negative, got {beta}",
+        )
         self.beta = beta
 
     def forward(
@@ -277,6 +352,15 @@ class VAELoss(nn.Module):
         input_tensor: Tensor,
         vae_result: VAEResult,
     ) -> tuple[Tensor, VAELossData]:
+        require(
+            input_tensor.shape == vae_result.output_tensor.shape,
+            ModelShapeError,
+            lambda: (
+                "input and reconstruction shapes must match, got "
+                f"{tuple(input_tensor.shape)} and "
+                f"{tuple(vae_result.output_tensor.shape)}"
+            ),
+        )
         reconstruction_loss = F.mse_loss(
             input_tensor,
             vae_result.output_tensor,

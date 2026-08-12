@@ -16,15 +16,22 @@ class AugmentationsConfig:
 
     def __post_init__(self) -> None:
         require(
-            (self.random_crop_scale is None) or (self.random_crop_scale >= 1),
+            self.random_crop_scale is None or self.random_crop_scale >= 1,
             ConfigurationError,
-            "random_crop_scale must be >= 1"
+            lambda: (
+                "random_crop_scale must be None or at least 1, got "
+                f"{self.random_crop_scale}"
+            ),
         )
 
         require(
-            (self.random_horizontal_flip is None) or (0 <= self.random_horizontal_flip <= 1),
+            self.random_horizontal_flip is None
+            or 0 <= self.random_horizontal_flip <= 1,
             ConfigurationError,
-            "random_horizontal_flip must be in [0, 1]"
+            lambda: (
+                "random_horizontal_flip must be None or in [0, 1], got "
+                f"{self.random_horizontal_flip}"
+            ),
         )
 
 
@@ -36,6 +43,12 @@ class AugmentationBuilder(ContainingConfiguration):
         super().__init__(config=config)
 
     def build(self, image_shape: ImageShape) -> v2.Transform:
+        require(
+            len(image_shape) == 2 and all(size > 0 for size in image_shape),
+            ValueError,
+            f"image_shape must contain two positive dimensions, got {image_shape}",
+        )
+
         augmentation_list = []
         if self.config.random_crop_scale is not None:
             scaled_size = tuple(int(size * self.config.random_crop_scale) for size in image_shape)

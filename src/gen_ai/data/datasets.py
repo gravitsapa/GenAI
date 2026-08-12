@@ -17,6 +17,7 @@ from gen_ai.project_config import DATA_DIR
 from gen_ai.data.image import ImageShape
 from gen_ai.data.image_sample import ImageSample
 from gen_ai.data.augmentations import AugmentationBuilder, AugmentationsConfig
+from gen_ai.exceptions import ConfigurationError, require
 
 
 class ImageDataset(ABC, Dataset):
@@ -64,6 +65,13 @@ class DescribedImageDataset(ContainingConfiguration, ImageDataset):
 class ImageDatasetConfig:
     image_shape: ImageShape
     data_dir: Path=DATA_DIR
+
+    def __post_init__(self) -> None:
+        require(
+            len(self.image_shape) == 2 and all(size > 0 for size in self.image_shape),
+            ConfigurationError,
+            f"image_shape must contain two positive dimensions, got {self.image_shape}",
+        )
 
 
 class AnimeFaces256(DescribedImageDataset):

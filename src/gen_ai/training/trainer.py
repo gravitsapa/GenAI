@@ -18,12 +18,25 @@ from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.training.logger import Logger
 from gen_ai.training.metrics import WeightedMeanMetrics
 from gen_ai.sampling.sampler import Sampler
+from gen_ai.exceptions import ConfigurationError, TrainingError, require
 
 
 @dataclass
 class TrainerConfig:
     num_epochs: int
     log_every_epoch: int
+
+    def __post_init__(self) -> None:
+        require(
+            self.num_epochs > 0,
+            ConfigurationError,
+            f"num_epochs must be positive, got {self.num_epochs}",
+        )
+        require(
+            self.log_every_epoch > 0,
+            ConfigurationError,
+            f"log_every_epoch must be positive, got {self.log_every_epoch}",
+        )
 
 
 class Trainer(ContainingConfiguration):
@@ -62,6 +75,12 @@ class Trainer(ContainingConfiguration):
             model_output = self.model(image)
             loss, batch_loss_metrics = self.loss_function(image, model_output)
 
+            require(
+                loss.ndim == 0,
+                TrainingError,
+                f"loss function must return a scalar tensor, got shape {tuple(loss.shape)}",
+            )
+
             loss.backward()
 
             self.optimizer.step()
@@ -94,6 +113,11 @@ class Trainer(ContainingConfiguration):
     def train_loop(
         self,
     ) -> list[dict]:
+        require(
+            len(self.data_loader) > 0,
+            TrainingError,
+            "cannot train with an empty data loader",
+        )
         self.logger.log_config(self.get_metadata_dict())
 
         sampler = Sampler(self.model)
