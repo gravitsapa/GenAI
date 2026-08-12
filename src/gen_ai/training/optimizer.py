@@ -6,10 +6,10 @@ from torch.optim.optimizer import Optimizer
 from torch.optim import Adam
 from torch.optim.optimizer import ParamsT
 
-from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 
-class DescribedOptimizer(Optimizer, DeclarationDescribed):
+class DescribedOptimizer(ContainingConfiguration, Optimizer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -25,9 +25,5 @@ class DescribedAdam(DescribedOptimizer, Adam):
         params: ParamsT,
         config: AdamConfig,
     ):
-        super().__init__(params=params, **asdict(config))
+        super().__init__(config=config, params=params, **asdict(config))
 
-        self.config = config
-
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))

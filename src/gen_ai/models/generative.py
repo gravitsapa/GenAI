@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from gen_ai.metadata.collectors import DeclarationDescribed, RuntimeDescribed
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 
 class ImageGenerativeModel(nn.Module, ABC):
@@ -16,5 +16,6 @@ class ImageGenerativeModel(nn.Module, ABC):
         pass
 
 
-class DescribedImageGenerativeModel(ImageGenerativeModel, DeclarationDescribed):
-    pass
+class DescribedImageGenerativeModel(ContainingConfiguration, ImageGenerativeModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

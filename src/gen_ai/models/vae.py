@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch import Tensor
 from dataclasses import dataclass, asdict
 
-from gen_ai.metadata.collectors import DeclarationMetadata
 from gen_ai.data.image import ImageShape
 from gen_ai.models.common import ModuleFactory, get_model_device
 from gen_ai.models.cnn import conv1x1, conv3x3, ResNetBlock2D, ResChange
@@ -184,7 +183,7 @@ class VAE(DescribedImageGenerativeModel):
         self,
         vae_config: VAEConfig
     ):
-        super().__init__()
+        super().__init__(config=vae_config)
 
         self.config = vae_config
 
@@ -257,12 +256,6 @@ class VAE(DescribedImageGenerativeModel):
 
         output_tensor = self._sample_by_latent(latent)
         return output_tensor
-
-
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(
-            asdict(self.config)
-        )
 
 
 @dataclass

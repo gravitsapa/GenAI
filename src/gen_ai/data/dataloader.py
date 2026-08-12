@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 
 from torch.utils.data import DataLoader
 
-from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 from gen_ai.data.datasets import DescribedImageDataset
 
 
@@ -15,12 +15,8 @@ class DataloaderConfig:
     persistent_workers: bool
 
 
-class DescribedImageDataLoader(DataLoader, DeclarationDescribed):
+class DescribedImageDataLoader(ContainingConfiguration, DataLoader):
     def __init__(self, dataset: DescribedImageDataset, config: DataloaderConfig):
-        super().__init__(dataset=dataset, **asdict(config))
+        super().__init__(config=config, dataset=dataset, **asdict(config))
 
-        self.config = config
-
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))
 

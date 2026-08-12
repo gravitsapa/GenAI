@@ -4,9 +4,9 @@ import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LRScheduler
 from torch.optim import Optimizer
 
-from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
-class DescribedScheduler(LRScheduler, DeclarationDescribed):
+class DescribedScheduler(ContainingConfiguration, LRScheduler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -23,9 +23,5 @@ class DescribedCosineAnnealingLR(DescribedScheduler, CosineAnnealingLR):
         optimizer: Optimizer,
         config: CosineAnnealingLRConfig,
     ):
-        super().__init__(optimizer=optimizer, **asdict(config))
+        super().__init__(config=config, optimizer=optimizer, **asdict(config))
 
-        self.config = config
-
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))

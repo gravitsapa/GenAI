@@ -5,7 +5,7 @@ import torch
 from torchvision.transforms import v2
 
 from gen_ai.data.image import ImageShape
-from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -14,13 +14,12 @@ class AugmentationsConfig:
     random_horizontal_flip: Optional[float] = 0.5
 
 
-class AugmentationBuilder(DeclarationDescribed):
+class AugmentationBuilder(ContainingConfiguration):
     def __init__(
         self,
         config: AugmentationsConfig,
     ):
-        super().__init__()
-        self.config = config
+        super().__init__(config=config)
 
     def build(self, image_shape: ImageShape) -> v2.Transform:
         augmentation_list = []
@@ -34,5 +33,3 @@ class AugmentationBuilder(DeclarationDescribed):
             augmentation_list.append(v2.RandomHorizontalFlip(p=self.config.random_horizontal_flip))
         return v2.Compose(augmentation_list)
 
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))

@@ -11,7 +11,7 @@ from torchvision.transforms import v2
 
 from datasets import load_dataset
 
-from gen_ai.metadata.collectors import DeclarationDescribed, DeclarationMetadata
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 from gen_ai.project_config import DATA_DIR
 from gen_ai.data.image import ImageShape
@@ -55,8 +55,9 @@ class ImageDataset(ABC, Dataset):
         return transform(pil_image)
 
 
-class DescribedImageDataset(ImageDataset, DeclarationDescribed):
-    pass
+class DescribedImageDataset(ContainingConfiguration, ImageDataset):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -72,11 +73,10 @@ class AnimeFaces256(DescribedImageDataset):
         augmentation_builder: AugmentationBuilder,
     ):
         super().__init__(
+            config=image_dataset_config,
             image_shape=image_dataset_config.image_shape,
             augmentation_builder=augmentation_builder,
         )
-
-        self.config = image_dataset_config
 
         self.dataset_dir = self.config.data_dir / "anime_faces_256"
 
@@ -97,8 +97,3 @@ class AnimeFaces256(DescribedImageDataset):
             tags=self.data['train'][index]['tags'],
         )
 
-    
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        metadata = asdict(self.config)
-        metadata['augmentations'] = self.augmentation_builder.get_declaration_metadata_dict()
-        return DeclarationMetadata(metadata)

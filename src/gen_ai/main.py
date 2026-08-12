@@ -69,7 +69,6 @@ def main():
 
     trainer = Trainer(
         vae,
-        anime_faces,
         data_loader,
         VAELoss(),
         optimizer,

@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm, trange
 
-from gen_ai.metadata.collectors import DeclarationMetadata, DeclarationDescribed
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 from gen_ai.data.dataloader import DescribedImageDataLoader
 from gen_ai.data.datasets import DescribedImageDataset
@@ -26,11 +26,10 @@ class TrainerConfig:
     log_every_epoch: int
 
 
-class Trainer(DeclarationDescribed):
+class Trainer(ContainingConfiguration):
     def __init__(
         self,
         model: DescribedImageGenerativeModel,
-        dataset: DescribedImageDataset,
         data_loader: DescribedImageDataLoader,
         loss_function: nn.Module,
         optimizer: DescribedOptimizer,
@@ -38,14 +37,14 @@ class Trainer(DeclarationDescribed):
         scheduler: DescribedScheduler,
         config: TrainerConfig,
     ):
+        super().__init__(config=config)
+
         self.model = model
-        self.dataset = dataset
         self.data_loader = data_loader
         self.loss_function = loss_function
         self.optimizer = optimizer
         self.logger = logger
         self.scheduler = scheduler
-        self.config = config
 
 
     def _train_one_epoch(self) -> dict[str, float]:
@@ -77,18 +76,6 @@ class Trainer(DeclarationDescribed):
         return metrics_accumulator.compute()
 
 
-    def _collect_config(self) -> dict:
-        experiment_config = {}
-        experiment_config['model_config'] = self.model.get_declaration_metadata_dict()
-        experiment_config['dataset_config'] = self.dataset.get_declaration_metadata_dict()
-        experiment_config['dataloader_config'] = self.data_loader.get_declaration_metadata_dict()
-        experiment_config['optimizer_config'] = self.optimizer.get_declaration_metadata_dict()
-        experiment_config['scheduler_config'] = self.scheduler.get_declaration_metadata_dict()
-        experiment_config['trainer_config'] = self.get_declaration_metadata_dict()
-
-        return experiment_config
-
-
     def _collect_metrics(
         self,
         epoch_num: int,
@@ -107,7 +94,7 @@ class Trainer(DeclarationDescribed):
     def train_loop(
         self,
     ) -> list[dict]:
-        self.logger.log_config(self._collect_config())
+        self.logger.log_config(self.get_metadata_dict())
 
         sampler = Sampler(self.model)
 
@@ -152,5 +139,3 @@ class Trainer(DeclarationDescribed):
 
         return metrics_history
 
-    def _get_specific_declaration_metadata(self) -> DeclarationMetadata:
-        return DeclarationMetadata(asdict(self.config))
