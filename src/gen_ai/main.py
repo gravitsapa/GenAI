@@ -4,8 +4,8 @@ from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
 from gen_ai.models.vae import VAE, VAELoss, VAEConfig
-from gen_ai.training.optimizer import DescribedAdam, AdamConfig
-from gen_ai.training.scheduler import DescribedCosineAnnealingLR, CosineAnnealingLRConfig
+from gen_ai.training.optimizer import DescribedAdamW, AdamWConfig
+from gen_ai.training.scheduler import DescribedCosineAnnealingLR, CosineAnnealingLRConfig, DescribedSequentialLR, DescribedLinearLR, LinearLRConfig
 from gen_ai.training.trainer import Trainer, TrainerConfig
 from gen_ai.training.logger import Logger
 
@@ -19,7 +19,10 @@ def main():
     image_shape = (64, 64)
     num_epochs=200
 
-    augmentation_builder = AugmentationBuilder(AugmentationsConfig())
+    augmentation_builder = AugmentationBuilder(AugmentationsConfig(
+        random_crop_scale=None,
+        random_horizontal_flip=0.5,
+    ))
 
     anime_faces = AnimeFaces256(
         ImageDatasetConfig(
@@ -30,7 +33,7 @@ def main():
     data_loader = DescribedImageDataLoader(
         anime_faces,
         DataloaderConfig(
-            batch_size=32,
+            batch_size=48,
             shuffle=True,
             pin_memory=True,
             num_workers=2,
@@ -49,23 +52,43 @@ def main():
         mid_layers=2,
     )).to(device)
 
+    checkpoint_filename = "D:\\Documents\\GenAI\\experiments\\extended_vae_wo_augment_batch48_lr2e-4_2026-08-14_00-29\\checkpoints\\checkpoint_epoch_0200.pt"
+    checkpoint_file = torch.load(checkpoint_filename, weights_only=False, map_location=device)
 
-    optimizer = DescribedAdam(
+    vae.load_state_dict(checkpoint_file['model_state_dict'])
+    print("Successfully loaded weights")
+
+    optimizer = DescribedAdamW(
         vae.parameters(),
-        AdamConfig(
+        AdamWConfig(
             lr=1e-4,
         )
     )
 
-    scheduler = DescribedCosineAnnealingLR(
-        optimizer,
-        CosineAnnealingLRConfig(
-            T_max=num_epochs,
-            eta_min=1e-6,
-        ),
+    scheduler = DescribedSequentialLR(
+        optimizer=optimizer,
+        schedulers=[
+            DescribedLinearLR(
+                optimizer,
+                LinearLRConfig(
+                    total_iters=20,
+                )
+            ),
+            DescribedCosineAnnealingLR(
+                optimizer,
+                CosineAnnealingLRConfig(
+                    T_max=num_epochs,
+                    eta_min=1e-6,
+                ),
+            )
+        ],
+        milestones=[
+            20,
+        ]
     )
 
-    logger = Logger("extended_vae_waugment")
+
+    logger = Logger("extended_vae_wo_augment_batch48_lr2e-4_epochs201-400")
 
     trainer = Trainer(
         vae,

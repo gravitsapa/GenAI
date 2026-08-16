@@ -10,7 +10,7 @@ def _is_dataclass_instance(obj):
 
 
 class ContainingConfiguration:
-    def __init__(self, config, *args, **kwargs):
+    def __init__(self, config: Any, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.config = config
@@ -22,7 +22,7 @@ class ContainingConfiguration:
 
 
     def _check_is_config(self, config: Any) -> bool:
-        return _is_dataclass_instance(config)
+        return config is None or _is_dataclass_instance(config)
 
 
     def _get_additional_metadata(self) -> Optional[dict]:
@@ -42,7 +42,8 @@ class ContainingConfiguration:
     def get_metadata_dict(self) -> dict:
         metadata_dict = {}
         metadata_dict["class"] = self.__class__.__name__
-        metadata_dict["config"] = asdict(self.config)
+        if self.config is not None:
+            metadata_dict["config"] = asdict(self.config)
 
         attributes_metadata = self._get_attributes_metadata()
         if attributes_metadata:
