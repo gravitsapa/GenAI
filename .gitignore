@@ -1,2 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Packaging
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+.conda/
+
+# Tests / tools
+.pytest_cache/
+.ruff_cache/
+
+# Project data
+/data/
+/experiments/
+
+# VS code
 .vscode/
-.data/
+
+# Ipynb files
+console.ipynb

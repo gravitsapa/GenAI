@@ -1,1 +1,1 @@
-### GenAI Pet Project
+## GenAI Pet Project
