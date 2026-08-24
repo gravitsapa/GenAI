@@ -7,9 +7,9 @@ from torch import Tensor
 
 from gen_ai.exceptions import require
 from gen_ai.models.common import ModuleFactory
-from gen_ai.models.upsampling import Upsample2D
-from gen_ai.models.downsampling import Downsample2D
-from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
+from gen_ai.models.vae.upsampling import Upsample2D
+from gen_ai.models.vae.downsampling import Downsample2D
+from gen_ai.models.vae.normalization import NormalizationFactory, GroupNormalizationFactory
 
 
 def conv3x3(

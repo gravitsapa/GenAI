@@ -3,7 +3,7 @@ import torch
 from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
-from gen_ai.models.vae import VAE, VAELoss, VAEConfig
+from gen_ai.models.vae.vae import VAE, VAELoss, VAEConfig
 from gen_ai.training.optimizer import DescribedAdamW, AdamWConfig
 from gen_ai.training.scheduler import DescribedCosineAnnealingLR, CosineAnnealingLRConfig, DescribedSequentialLR, DescribedLinearLR, LinearLRConfig
 from gen_ai.training.trainer import Trainer, TrainerConfig

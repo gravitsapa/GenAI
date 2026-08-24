@@ -8,8 +8,8 @@ from dataclasses import dataclass, asdict
 
 from gen_ai.data.image import ImageShape
 from gen_ai.models.common import ModuleFactory, get_model_device
-from gen_ai.models.cnn import conv1x1, conv3x3, ResNetStack2D, ResChange
-from gen_ai.models.normalization import NormalizationFactory, GroupNormalizationFactory
+from gen_ai.models.vae.cnn import conv1x1, conv3x3, ResNetStack2D, ResChange
+from gen_ai.models.vae.normalization import NormalizationFactory, GroupNormalizationFactory
 
 from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.exceptions import ConfigurationError, ModelShapeError, require
