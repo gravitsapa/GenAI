@@ -102,6 +102,6 @@ class EffVDVAE(nn.Module):
 
     def forward(self, intput_tensor: Tensor) -> tuple[Tensor, list[tuple[Tensor, Tensor]], list[tuple[Tensor, Tensor]]]:
         skip_list = self.bottom_up(intput_tensor)
-        output_tensor, posterior_params_list, prior_params_list = self.top_down(skip_list)
+        output_tensor, posterior_params_list, prior_params_list = self.top_down(skip_list[::-1])
 
         return output_tensor, posterior_params_list, prior_params_list

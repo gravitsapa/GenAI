@@ -99,6 +99,8 @@ class TopDown(nn.Module):
         out_channels: int = 3,
         out_conv_kernel: int = 3,
     ):
+        super().__init__()
+
         require(
             len(blocks_channels) == len(blocks_stride),
             ModelShapeError,
@@ -108,8 +110,19 @@ class TopDown(nn.Module):
             ),
         )
 
+        stride_prod = np.prod(blocks_stride)
+
+        require(
+            image_shape[0] % stride_prod == 0 and image_shape[1] % stride_prod == 0,
+            ModelShapeError,
+            lambda: (
+                "image_shape dimensions must be divisible by the product of "
+                f"blocks_stride ({stride_prod}), got {image_shape}"
+            ),
+        )
+
         top_latent_shape = (1, blocks_channels[0]) + \
-            tuple(np.array(image_shape, dtype=int) // np.prod(blocks_stride))
+            tuple(np.array(image_shape, dtype=int) // stride_prod)
         self.trainable_h = torch.nn.Parameter(
             data=torch.empty(top_latent_shape),
             requires_grad=True
@@ -132,6 +145,7 @@ class TopDown(nn.Module):
             blocks_stride,
             blocks_skip_channels,
             blocks_latent_variates,
+            strict=True,
         ):
             self.blocks.append(
                 TopDownBlock(

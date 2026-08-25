@@ -16,7 +16,6 @@ class GaussianLatentLayer(nn.Module):
         self,
         in_channels,
         num_variates,
-        min_std: float=np.exp(-2),
         gradient_smoothing_beta: float=np.log(2),
     ):
         super().__init__()
@@ -27,7 +26,6 @@ class GaussianLatentLayer(nn.Module):
             kernel_size=1,
         )
 
-        self.min_std = min_std
         self.softplus = torch.nn.Softplus(beta=gradient_smoothing_beta)
 
     def sample(

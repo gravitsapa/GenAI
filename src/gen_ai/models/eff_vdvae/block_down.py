@@ -31,7 +31,7 @@ class Upsample(nn.Module):
     ):
         super().__init__()
 
-        self.ops = nn.Sequential(*{
+        self.ops = nn.Sequential(*[
             conv2d(
                 in_channels=in_channels,
                 out_channels=out_channels,
@@ -44,7 +44,7 @@ class Upsample(nn.Module):
                 out_channels=out_channels,
                 kernel_size=1,
             ),
-        })
+        ])
 
     def forward(self, input_tensor: Tensor) -> Tensor:
         return self.ops(input_tensor)

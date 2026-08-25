@@ -76,6 +76,8 @@ class BottomUp(nn.Module):
         in_channels: int = 3,
         in_conv_kernel: int = 3,
     ):
+        super().__init__()
+
         require(
             len(blocks_channels) == len(blocks_stride),
             ModelShapeError,
