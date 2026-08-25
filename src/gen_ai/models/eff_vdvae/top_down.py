@@ -80,6 +80,25 @@ class TopDownBlock(nn.Module):
 
         return y, posterior_params_list, prior_params_list
 
+    def sample_from_prior(
+        self,
+        y: Tensor,
+        temperature: float,
+    ) -> tuple[Tensor, list[Tensor]]:
+        prior_zs = []
+
+        y, prior_z = self.upsample_block.sample_from_prior(y, temperature=temperature)
+
+        prior_zs.append(prior_z)
+
+        for block_down in self.blocks_down:
+            y, prior_z = block_down.sample_from_prior(y, temperature=temperature)
+
+            prior_zs.append(prior_z)
+
+        return y, prior_zs
+        
+
 
 @dataclass(kw_only=True)
 class TopDownBlocksCommon:
@@ -189,3 +208,23 @@ class TopDown(nn.Module):
         y = self.output_conv(y)
 
         return y, posterior_params_list, prior_params_list
+
+    @torch.inference_mode()
+    def sample_from_prior(
+        self, 
+        batch_size: int, 
+        temperature: float,
+    ) -> tuple[Tensor, list[Tensor]]:
+        y = torch.tile(self.trainable_h, (batch_size, 1, 1, 1))
+
+        prior_zs = []
+        for block in self.blocks:
+            y, new_prior_zs = block.sample_from_prior(y, temperature=temperature)
+
+            prior_zs.extend(new_prior_zs)
+
+        y = self.output_conv(y)
+
+        return y, prior_zs
+
+        

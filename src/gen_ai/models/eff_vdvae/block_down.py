@@ -174,3 +174,31 @@ class BlockDown(nn.Module):
         y = self.residual_block(y)
 
         return y, posterior_params, prior_params
+    
+    def sample_from_prior(
+        self,
+        y: Tensor,
+        temperature: float,
+    ) -> tuple[Tensor, Tensor]:
+        device = get_model_device(self)
+
+        y = self.resample(y)
+
+        prior_residual, prior_dist_params_input = torch.chunk(
+            self.prior_net(y),
+            chunks=2,
+            dim=1,
+        )
+
+        y = y + prior_residual
+
+        prior_params = self.prior_layer(prior_dist_params_input)
+        z_sample = self.prior_layer.sample(prior_params, device=device, temperature=temperature)
+
+        proj_z = self.z_projection(z_sample)
+
+        y = y + proj_z
+
+        y = self.residual_block(y)
+
+        return y, z_sample

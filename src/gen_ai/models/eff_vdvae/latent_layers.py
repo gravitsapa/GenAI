@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor, Device
+from torch import Tensor
 
 from gen_ai.models.eff_vdvae.cnn import conv2d
 
@@ -31,7 +31,7 @@ class GaussianLatentLayer(nn.Module):
     def sample(
         self,
         dist_params: tuple[Tensor, Tensor],
-        device: Device,
+        device: torch.device,
         temperature: float = 1.,
     ) -> Tensor:
         mean, std = dist_params
