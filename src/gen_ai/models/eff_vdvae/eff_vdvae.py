@@ -3,12 +3,13 @@ from dataclasses import dataclass, asdict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
 
 from gen_ai.exceptions import ConfigurationError, ModelShapeError, require
 from gen_ai.models.common import get_model_device, one_hot
 from gen_ai.models.generative import DescribedImageGenerativeModel, ImageShape
-from gen_ai.models.eff_vdvae.loss import logistic_mixture_ll, diag_normal_kl_divergence
+from gen_ai.models.eff_vdvae.loss import logistic_mixture_log_tensor, diag_normal_kl_divergence
 from gen_ai.models.eff_vdvae.top_down import (
     TopDown,
     TopDownBlocksCommon,
@@ -380,40 +381,42 @@ class EffVDVAE(DescribedImageGenerativeModel):
         logits, posterior_params_list, prior_params_list = forward_output
 
         logit_probs, model_means, scales, model_coeffs = self._parse_logits(logits)
+        log_pi = F.log_softmax(logit_probs, dim=1)
 
         means0 = model_means[:, 0, :, :, :]
         means1 = (
             model_means[:, 1, :, :, :] +
-            input_tensor[:, 0, :, :, :] * model_coeffs[:, 0, :, :, :]
+            input_tensor[:, 0, :, :] * model_coeffs[:, 0, :, :, :]
         )
         means2 = (
             model_means[:, 2, :, :, :] +
-            input_tensor[:, 0, :, :, :] * model_coeffs[:, 1, :, :, :] +
-            input_tensor[:, 1, :, :, :] * model_coeffs[:, 2, :, :, :]
+            input_tensor[:, 0, :, :] * model_coeffs[:, 1, :, :, :] +
+            input_tensor[:, 1, :, :] * model_coeffs[:, 2, :, :, :]
         )
         
-        scalar = np.prod(input_tensor.size()).item()
+        scalar = input_tensor.numel()
 
-        nll = -(
-            logistic_mixture_ll(
-                input_tensor=input_tensor[:, 0, :, :, :],
-                logit_probs=logit_probs,
+        nll = -torch.sum(torch.logsumexp(
+            logistic_mixture_log_tensor(
+                input_tensor=input_tensor[:, 0, :, :],
+                logit_probs=log_pi,
                 means=means0,
                 scales=scales[:, 0, :, :, :],
             ) + 
-            logistic_mixture_ll(
-                input_tensor=input_tensor[:, 1, :, :, :],
-                logit_probs=logit_probs,
+            logistic_mixture_log_tensor(
+                input_tensor=input_tensor[:, 1, :, :],
+                logit_probs=log_pi,
                 means=means1,
                 scales=scales[:, 1, :, :, :],
             ) + 
-            logistic_mixture_ll(
-                input_tensor=input_tensor[:, 2, :, :, :],
-                logit_probs=logit_probs,
+            logistic_mixture_log_tensor(
+                input_tensor=input_tensor[:, 2, :, :],
+                logit_probs=log_pi,
                 means=means2,
                 scales=scales[:, 2, :, :, :],
-            )
-        ) / scalar
+            ),
+            dim=1
+        )) / scalar
 
         kl_div_list = torch.stack([
             diag_normal_kl_divergence(q, p)

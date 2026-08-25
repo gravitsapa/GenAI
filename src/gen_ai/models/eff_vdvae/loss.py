@@ -25,7 +25,7 @@ def diag_normal_kl_divergence(
     return loss
 
 
-def logistic_mixture_ll(
+def logistic_mixture_log_tensor(
     input_tensor: Tensor, # B, H, W
     logit_probs: Tensor, # B, M, H, W
     means: Tensor, # B, M, H, W
@@ -38,4 +38,4 @@ def logistic_mixture_ll(
 
     l = logit_probs -y - torch.log(scales) - 2 * F.softplus(-y)
 
-    return torch.logsumexp(l, dim=1)
+    return l
