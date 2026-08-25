@@ -11,15 +11,13 @@ from torch import Tensor
 from gen_ai.exceptions import require, ModelShapeError
 from gen_ai.models.generative import ImageShape
 from gen_ai.models.eff_vdvae.cnn import conv2d
-from gen_ai.models.eff_vdvae.block_down import BlockDown, ResConvCellCommon
+from gen_ai.models.eff_vdvae.block_down import BlockDown, ResConvCellCommonInBlockDown
 
 
 @dataclass(kw_only=True)
 class TopDownBlocksConfig:
     n_residual_conv_cells: int
-    res_conv_common: ResConvCellCommon
-    skip_channels: int
-    latent_variate: int
+    res_conv_common: ResConvCellCommonInBlockDown
 
 
 class TopDownBlock(nn.Module):
@@ -29,6 +27,8 @@ class TopDownBlock(nn.Module):
         n_blocks_down: int,
         blocks_config: TopDownBlocksConfig,
         stride: int,
+        skip_channels: int,
+        latent_variates: int,
         out_channels: Optional[int]=None,
     ):
         super().__init__()
@@ -41,8 +41,8 @@ class TopDownBlock(nn.Module):
             out_channels=out_channels,
             n_residual_conv_cells=blocks_config.n_residual_conv_cells,
             residual_conv_cell_config=blocks_config.res_conv_common,
-            skip_channels=blocks_config.skip_channels,
-            latent_variates=blocks_config.latent_variate,
+            skip_channels=skip_channels,
+            latent_variates=latent_variates,
             stride=stride,
         )
 
@@ -52,8 +52,8 @@ class TopDownBlock(nn.Module):
                 out_channels=out_channels,
                 n_residual_conv_cells=blocks_config.n_residual_conv_cells,
                 residual_conv_cell_config=blocks_config.res_conv_common,
-                skip_channels=blocks_config.skip_channels,
-                latent_variates=blocks_config.latent_variate,
+                skip_channels=skip_channels,
+                latent_variates=latent_variates,
                 stride=1,
             )
             for _ in range(n_blocks_down)
@@ -92,8 +92,10 @@ class TopDown(nn.Module):
         self,
         image_shape: ImageShape,
         blocks_common_config: TopDownBlocksCommon,
-        blocks_channels: tuple[int],
-        blocks_stride: tuple[int],
+        blocks_channels: tuple[int, ...],
+        blocks_stride: tuple[int, ...],
+        blocks_skip_channels: tuple[int, ...],
+        blocks_latent_variates: tuple[int, ...],
         out_channels: int = 3,
         out_conv_kernel: int = 3,
     ):
@@ -118,10 +120,18 @@ class TopDown(nn.Module):
 
         blocks_in_channels = blocks_channels[0:1] + blocks_channels[:-1]
 
-        for block_in_channels, block_out_channels, block_stride in zip(
+        for (
+            block_in_channels, 
+            block_out_channels, 
+            block_stride,
+            block_skip_channels,
+            block_latent_variates,
+        ) in zip(
             blocks_in_channels,
             blocks_channels,
             blocks_stride,
+            blocks_skip_channels,
+            blocks_latent_variates,
         ):
             self.blocks.append(
                 TopDownBlock(
@@ -130,6 +140,8 @@ class TopDown(nn.Module):
                     n_blocks_down=blocks_common_config.n_blocks_down,
                     blocks_config=blocks_common_config.blocks_config,
                     stride=block_stride,
+                    skip_channels=block_skip_channels,
+                    latent_variates=block_latent_variates,
                 )
             )
 

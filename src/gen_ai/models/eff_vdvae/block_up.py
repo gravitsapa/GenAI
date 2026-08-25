@@ -33,7 +33,7 @@ class Downsample(nn.Module):
 
 
 @dataclass(kw_only=True)
-class ResConvCellCommon:
+class ResConvCellCommonInBlocksUp:
     kernel_size: int | tuple[int, int]
     n_layers: int
     init_scaler: float
@@ -45,7 +45,7 @@ class BlockUp(nn.Module):
         self,
         in_channels: int,
         n_residual_conv_cells: int,
-        residual_conv_cell_config: ResConvCellCommon,
+        residual_conv_cell_config: ResConvCellCommonInBlocksUp,
         out_channels: Optional[int]=None,
         stride: int = 1,
         compute_skip: bool = False,
