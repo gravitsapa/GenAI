@@ -1,5 +1,5 @@
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 import torch
 import torch.nn as nn
@@ -8,13 +8,13 @@ from torch import Tensor
 from gen_ai.exceptions import ConfigurationError, ModelShapeError, require
 from gen_ai.models.common import get_model_device, one_hot
 from gen_ai.models.generative import DescribedImageGenerativeModel, ImageShape
+from gen_ai.models.eff_vdvae.loss import logistic_mixture_ll, diag_normal_kl_divergence
 from gen_ai.models.eff_vdvae.top_down import (
     TopDown,
     TopDownBlocksCommon,
     TopDownBlocksConfig,
     ResConvCellCommonInBlockDown,
 )
-
 from gen_ai.models.eff_vdvae.bottom_up import (
     BottomUp, 
     BottomUpBlocksCommon, 
@@ -170,6 +170,15 @@ class EffVDVAEConfig:
         )
 
 
+@dataclass
+class EffVDVAELossData:
+    reconstruction_loss: float
+    kl_divergence: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
 class EffVDVAE(DescribedImageGenerativeModel):
     def __init__(
         self,
@@ -243,21 +252,19 @@ class EffVDVAE(DescribedImageGenerativeModel):
             ),
         )
         skip_list = self.bottom_up(input_tensor)
-        output_tensor, posterior_params_list, prior_params_list = self.top_down(skip_list[::-1])
+        logits, posterior_params_list, prior_params_list = self.top_down(skip_list[::-1])
 
-        return output_tensor, posterior_params_list, prior_params_list
+        return logits, posterior_params_list, prior_params_list
 
-    
-    @torch.inference_mode()
-    def _sample_from_logits(
+
+    def _parse_logits(
         self,
         logits: Tensor,
         smoothing_beta: float = np.log(2),
         min_scale: float = np.exp(-250),
-        temperature: float = 1.,
-    ) -> Tensor:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         device = get_model_device(self)
-        
+
         n_mixtures = self.config.n_output_mixtures
         in_channels = self.config.in_channels
 
@@ -285,17 +292,31 @@ class EffVDVAE(DescribedImageGenerativeModel):
         l = l.reshape(B, in_channels, 3 * n_mixtures, H, W)  # B, C, 3 * M, H, W
 
         model_means = l[:, :, :n_mixtures, :, :]  # B, C, M, H, W
-
-        scales = l[:, :, n_mixtures: 2 * n_mixtures, :, :] # B, C, M, H, W
-        softplus = nn.Softplus(beta=smoothing_beta)
-        scales = torch.maximum(
-            softplus(scales), 
-            torch.as_tensor(min_scale, device=device),
-        )
-
+        scales_logits = l[:, :, n_mixtures: 2 * n_mixtures, :, :] # B, C, M, H, W
         model_coeffs = torch.tanh(
             l[:, :, 2 * n_mixtures: 3 * n_mixtures, :, :]
         )  # B, C, M, H, W
+
+        softplus = nn.Softplus(beta=smoothing_beta)
+        scales = torch.maximum(
+            softplus(scales_logits), 
+            torch.as_tensor(min_scale, device=device),
+        )
+
+        return logit_probs, model_means, scales, model_coeffs
+
+    
+    @torch.inference_mode()
+    def _sample_from_logits(
+        self,
+        logits: Tensor,
+        temperature: float = 1.,
+    ) -> Tensor:
+        device = get_model_device(self)
+        
+        n_mixtures = self.config.n_output_mixtures
+
+        logit_probs, model_means, scales, model_coeffs = self._parse_logits(logits)
 
         uniform_min = 1e-5
         uniform_max = 1. - 1e-5
@@ -349,3 +370,65 @@ class EffVDVAE(DescribedImageGenerativeModel):
         )
 
         return self._sample_from_logits(logits, temperature=temperature)
+
+    def compute_loss(
+        self,
+        input_tensor: Tensor,
+        forward_output: tuple[Tensor, list[tuple[Tensor, Tensor]], list[tuple[Tensor, Tensor]]],
+        beta: float = 1.,
+    ) -> tuple[Tensor, EffVDVAELossData]:
+        logits, posterior_params_list, prior_params_list = forward_output
+
+        logit_probs, model_means, scales, model_coeffs = self._parse_logits(logits)
+
+        means0 = model_means[:, 0, :, :, :]
+        means1 = (
+            model_means[:, 1, :, :, :] +
+            input_tensor[:, 0, :, :, :] * model_coeffs[:, 0, :, :, :]
+        )
+        means2 = (
+            model_means[:, 2, :, :, :] +
+            input_tensor[:, 0, :, :, :] * model_coeffs[:, 1, :, :, :] +
+            input_tensor[:, 1, :, :, :] * model_coeffs[:, 2, :, :, :]
+        )
+        
+        scalar = np.prod(input_tensor.size()).item()
+
+        nll = -(
+            logistic_mixture_ll(
+                input_tensor=input_tensor[:, 0, :, :, :],
+                logit_probs=logit_probs,
+                means=means0,
+                scales=scales[:, 0, :, :, :],
+            ) + 
+            logistic_mixture_ll(
+                input_tensor=input_tensor[:, 1, :, :, :],
+                logit_probs=logit_probs,
+                means=means1,
+                scales=scales[:, 1, :, :, :],
+            ) + 
+            logistic_mixture_ll(
+                input_tensor=input_tensor[:, 2, :, :, :],
+                logit_probs=logit_probs,
+                means=means2,
+                scales=scales[:, 2, :, :, :],
+            )
+        ) / scalar
+
+        kl_div_list = torch.stack([
+            diag_normal_kl_divergence(q, p)
+            for q, p in zip(
+                posterior_params_list,
+                prior_params_list,
+                strict=True
+            )
+        ], dim=0)
+
+        kl_div = torch.sum(kl_div_list) / scalar
+
+        loss = nll + beta * kl_div
+
+        return loss, EffVDVAELossData(
+            reconstruction_loss=nll.detach().cpu().item(),
+            kl_divergence=kl_div.detach().cpu().item(),
+        )

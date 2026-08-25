@@ -1,6 +1,7 @@
 ### TODO:
 * eff-VDVAE
 * change upsampling?
+* Discrete loss?
 * generalize everything
 * Advanced generative metrics
 * Add attention to VAE
