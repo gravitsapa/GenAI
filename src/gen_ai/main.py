@@ -3,11 +3,18 @@ import torch
 from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
-from gen_ai.models.vae.vae import VAE, VAELoss, VAEConfig
-from gen_ai.training.optimizer import DescribedAdamW, AdamWConfig
-from gen_ai.training.scheduler import DescribedCosineAnnealingLR, CosineAnnealingLRConfig, DescribedSequentialLR, DescribedLinearLR, LinearLRConfig
+from gen_ai.models.eff_vdvae.eff_vdvae import EffVDVAE, EffVDVAEConfig
+from gen_ai.training.optimizer import DescribedAdam, AdamConfig
+from gen_ai.training.scheduler import (
+    DescribedCosineAnnealingLR,
+    CosineAnnealingLRConfig,
+    DescribedSequentialLR,
+    DescribedLinearLR,
+    LinearLRConfig,
+)
 from gen_ai.training.trainer import Trainer, TrainerConfig
 from gen_ai.training.logger import Logger
+
 
 def main():
     device = torch.device(
@@ -17,7 +24,8 @@ def main():
     print(f"Running on {device}")
 
     image_shape = (64, 64)
-    num_epochs=200
+    num_epochs = 400
+    warmup_epochs = 10
 
     augmentation_builder = AugmentationBuilder(AugmentationsConfig(
         random_crop_scale=None,
@@ -35,33 +43,31 @@ def main():
         DataloaderConfig(
             batch_size=48,
             shuffle=True,
-            pin_memory=True,
+            pin_memory=device.type == "cuda",
             num_workers=2,
             persistent_workers=True,
+            drop_last=True,
         )
     )
 
     print("Loaded dataset")
 
-    vae = VAE(VAEConfig(
+    eff_vdvae = EffVDVAE(EffVDVAEConfig(
         image_shape=image_shape,
-        image_channels=3,
-        hidden_channels=4,
-        block_channels=(64, 128, 256, 512),
-        norm_num_groups=32,
-        mid_layers=2,
+        n_layers_in_block=2,
+        blocks_channels_bottom_up=(48, 96, 160, 224),
+        blocks_strides_bottom_up=(2, 2, 2, 2),
+        blocks_skip_channels=(48, 96, 160, 224),
+        blocks_latent_variates=(8, 16, 24, 32),
+        n_output_mixtures=10,
+        n_residual_conv_cells_in_layer=1,
+        n_conv_layers_in_residual=2,
     )).to(device)
 
-    checkpoint_filename = "D:\\Documents\\GenAI\\experiments\\extended_vae_wo_augment_batch48_lr2e-4_2026-08-14_00-29\\checkpoints\\checkpoint_epoch_0200.pt"
-    checkpoint_file = torch.load(checkpoint_filename, weights_only=False, map_location=device)
-
-    vae.load_state_dict(checkpoint_file['model_state_dict'])
-    print("Successfully loaded weights")
-
-    optimizer = DescribedAdamW(
-        vae.parameters(),
-        AdamWConfig(
-            lr=1e-4,
+    optimizer = DescribedAdam(
+        eff_vdvae.parameters(),
+        AdamConfig(
+            lr=2e-4,
         )
     )
 
@@ -71,29 +77,28 @@ def main():
             DescribedLinearLR(
                 optimizer,
                 LinearLRConfig(
-                    total_iters=20,
+                    total_iters=warmup_epochs,
                 )
             ),
             DescribedCosineAnnealingLR(
                 optimizer,
                 CosineAnnealingLRConfig(
-                    T_max=num_epochs,
+                    T_max=num_epochs - warmup_epochs,
                     eta_min=1e-6,
                 ),
             )
         ],
         milestones=[
-            20,
+            warmup_epochs,
         ]
     )
 
-
-    logger = Logger("extended_vae_wo_augment_batch48_lr2e-4_epochs201-400")
+    logger = Logger("eff_vdvae_64")
 
     trainer = Trainer(
-        vae,
+        eff_vdvae,
         data_loader,
-        VAELoss(),
+        eff_vdvae.compute_loss,
         optimizer,
         logger,
         scheduler,

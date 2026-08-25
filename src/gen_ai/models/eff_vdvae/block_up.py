@@ -25,6 +25,7 @@ class Downsample(nn.Module):
             out_channels=out_channels,
             kernel_size=stride,
             stride=stride,
+            padding=0,
         )
         self.nonlin = non_linearity()
 

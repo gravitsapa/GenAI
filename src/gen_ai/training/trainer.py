@@ -1,10 +1,10 @@
-from typing import Optional
+from collections.abc import Callable
+from typing import Any, Optional
 from dataclasses import dataclass, asdict
 
 from pathlib import Path
 
 import torch
-import torch.nn as nn
 from tqdm.auto import tqdm, trange
 
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
@@ -44,7 +44,7 @@ class Trainer(ContainingConfiguration):
         self,
         model: DescribedImageGenerativeModel,
         data_loader: DescribedImageDataLoader,
-        loss_function: nn.Module,
+        loss_function: Callable[[torch.Tensor, Any], tuple[torch.Tensor, Any]],
         optimizer: DescribedOptimizer,
         logger: Logger,
         scheduler: DescribedScheduler,
@@ -136,19 +136,20 @@ class Trainer(ContainingConfiguration):
 
             self.scheduler.step()
 
+            checkpoint = {
+                "epoch": epoch_num,
+                "model_state_dict": self.model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "scheduler_state_dict": self.scheduler.state_dict(),
+                "metrics_history": metrics_history,
+            }
+            self.logger.save_last_checkpoint(checkpoint)
+
             if epoch_num % self.config.log_every_epoch == 0:
                 self.logger.save_metrics_plot(
                     metrics_history,
                     epoch_num,
                 )
-
-                checkpoint = {
-                    "epoch": epoch_num,
-                    "model_state_dict": self.model.state_dict(),
-                    "optimizer_state_dict": self.optimizer.state_dict(),
-                    "scheduler_state_dict": self.scheduler.state_dict(),
-                    "metrics_history": metrics_history,
-                }
 
                 self.logger.save_checkpoint(
                     checkpoint,

@@ -14,6 +14,7 @@ class DataloaderConfig:
     pin_memory: bool
     num_workers: int
     persistent_workers: bool
+    drop_last: bool
 
     def __post_init__(self) -> None:
         require(

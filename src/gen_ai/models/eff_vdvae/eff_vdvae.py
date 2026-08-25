@@ -386,12 +386,12 @@ class EffVDVAE(DescribedImageGenerativeModel):
         means0 = model_means[:, 0, :, :, :]
         means1 = (
             model_means[:, 1, :, :, :] +
-            input_tensor[:, 0, :, :] * model_coeffs[:, 0, :, :, :]
+            input_tensor[:, 0:1, :, :] * model_coeffs[:, 0, :, :, :]
         )
         means2 = (
             model_means[:, 2, :, :, :] +
-            input_tensor[:, 0, :, :] * model_coeffs[:, 1, :, :, :] +
-            input_tensor[:, 1, :, :] * model_coeffs[:, 2, :, :, :]
+            input_tensor[:, 0:1, :, :] * model_coeffs[:, 1, :, :, :] +
+            input_tensor[:, 1:2, :, :] * model_coeffs[:, 2, :, :, :]
         )
         
         scalar = input_tensor.numel()

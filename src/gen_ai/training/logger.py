@@ -91,6 +91,15 @@ class Logger:
         torch.save(checkpoint, checkpoint_filename)
 
 
+    def save_last_checkpoint(
+        self,
+        checkpoint: dict,
+    ):
+        last_checkpoint_filename = self.checkpoints_dir / "last_checkpoint.pt"
+
+        torch.save(checkpoint, last_checkpoint_filename)
+
+
     def save_samples(
         self,
         fig: Figure,
