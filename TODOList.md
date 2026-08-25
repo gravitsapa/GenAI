@@ -1,5 +1,6 @@
 ### TODO:
 * eff-VDVAE
+* change upsampling?
 * generalize everything
 * Advanced generative metrics
 * Add attention to VAE

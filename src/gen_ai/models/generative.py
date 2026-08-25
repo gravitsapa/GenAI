@@ -7,6 +7,9 @@ from torch import Tensor
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 
+ImageShape = tuple[int, int]
+
+
 class ImageGenerativeModel(nn.Module, ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

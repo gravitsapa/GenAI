@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from gen_ai.models.common import ModuleFactory
-from gen_ai.models.eff_vdvae.cnn import conv, ResidualConvCell
+from gen_ai.models.eff_vdvae.cnn import conv2d, ResidualConvCell
 
 
 class Downsample(nn.Module):
@@ -20,7 +20,7 @@ class Downsample(nn.Module):
     ):
         super().__init__()
 
-        self.conv = conv(
+        self.conv = conv2d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=stride,
@@ -36,6 +36,7 @@ class Downsample(nn.Module):
 class ResConvCellCommon:
     kernel_size: int | tuple[int, int]
     n_layers: int
+    init_scaler: float
     bottleneck_channels_ratio: float = 0.25
 
 
@@ -50,6 +51,8 @@ class BlockUp(nn.Module):
         compute_skip: bool = False,
         skip_channels: Optional[int] = None,
     ):
+        super().__init__()
+
         if out_channels is None:
             out_channels = in_channels
         
@@ -57,6 +60,8 @@ class BlockUp(nn.Module):
             ResidualConvCell(
                 kernel_size=residual_conv_cell_config.kernel_size,
                 n_layers=residual_conv_cell_config.n_layers,
+                bottleneck_channels_ratio=residual_conv_cell_config.bottleneck_channels_ratio,
+                init_scaler=residual_conv_cell_config.init_scaler,
                 in_channels=in_channels,
                 out_channels=in_channels,
             )
@@ -68,7 +73,7 @@ class BlockUp(nn.Module):
             if skip_channels is None:
                 skip_channels = in_channels
 
-            self.skip_projection = conv(
+            self.skip_projection = conv2d(
                 in_channels=in_channels,
                 out_channels=skip_channels,
                 kernel_size=1,
@@ -84,6 +89,8 @@ class BlockUp(nn.Module):
             self.resample = ResidualConvCell(
                 kernel_size=1,
                 n_layers=residual_conv_cell_config.n_layers,
+                bottleneck_channels_ratio=residual_conv_cell_config.bottleneck_channels_ratio,
+                init_scaler=residual_conv_cell_config.init_scaler,
                 in_channels=in_channels,
                 out_channels=out_channels,
             )

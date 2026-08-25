@@ -9,7 +9,7 @@ from torch import Tensor
 from gen_ai.models.common import ModuleFactory
 
 
-def conv(
+def conv2d(
     in_channels: int,
     out_channels: int,
     kernel_size: int | tuple[int, int],
@@ -49,7 +49,7 @@ class ResidualConvCell(nn.Module):
         self.convs = nn.Sequential()
         self.convs.extend([
             non_linearity(),
-            conv(
+            conv2d(
                 in_channels=in_channels,
                 out_channels=bottleneck_channels,
                 kernel_size=1 if use_1x1_cells else 3,
@@ -59,14 +59,14 @@ class ResidualConvCell(nn.Module):
         for _ in range(n_layers):
             self.convs.extend([
                 non_linearity(),
-                conv(
+                conv2d(
                     in_channels=bottleneck_channels,
                     out_channels=bottleneck_channels,
                     kernel_size=kernel_size,
                 )
             ])
 
-        last_conv = conv(
+        last_conv = conv2d(
             in_channels=bottleneck_channels,
             out_channels=out_channels,
             kernel_size=1 if use_1x1_cells else 3,
@@ -81,7 +81,7 @@ class ResidualConvCell(nn.Module):
         if in_channels == out_channels:
             self.residual = nn.Identity()
         else:
-            self.residual = conv(
+            self.residual = conv2d(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=1
