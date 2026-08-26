@@ -27,7 +27,7 @@ from gen_ai.models.eff_vdvae.bottom_up import (
 @dataclass(frozen=True, kw_only=True)
 class EffVDVAEConfig:
     image_shape: ImageShape
-    n_layers_in_block: int
+    n_layers_in_block: tuple[int, ...]
     blocks_channels_bottom_up: tuple[int, ...]
     blocks_strides_bottom_up: tuple[int, ...]
     blocks_skip_channels: tuple[int, ...]
@@ -51,6 +51,7 @@ class EffVDVAEConfig:
         )
 
         block_counts = (
+            len(self.n_layers_in_block),
             len(self.blocks_channels_bottom_up),
             len(self.blocks_strides_bottom_up),
             len(self.blocks_skip_channels),
@@ -69,6 +70,11 @@ class EffVDVAEConfig:
                 "blocks_skip_channels, and blocks_latent_variates must have the same length, "
                 f"got {block_counts}"
             ),
+        )
+        require(
+            all(n_layers >= 0 for n_layers in self.n_layers_in_block),
+            ConfigurationError,
+            "n_layers_in_block must contain non negative layer counts",
         )
         require(
             all(channels > 0 for channels in self.blocks_channels_bottom_up),
@@ -106,11 +112,6 @@ class EffVDVAEConfig:
             self.n_output_mixtures > 0,
             ConfigurationError,
             f"n_output_mixtures must be positive, got {self.n_output_mixtures}",
-        )
-        require(
-            self.n_layers_in_block >= 0,
-            ConfigurationError,
-            f"n_layers_in_block must be non-negative, got {self.n_layers_in_block}",
         )
         require(
             self.n_residual_conv_cells_in_layer >= 0,
@@ -188,12 +189,11 @@ class EffVDVAE(DescribedImageGenerativeModel):
         super().__init__(config=config)
 
         self.config = config
-        blocks_cnt = len(self.config.blocks_channels_bottom_up)
+        layers_cnt = sum(n_layers + 1 for n_layers in self.config.n_layers_in_block)
 
-        init_scaler = np.sqrt(1. / ((1 + self.config.n_layers_in_block) * blocks_cnt))
+        init_scaler = np.sqrt(1. / float(layers_cnt))
 
         bottom_up_common_config = BottomUpBlocksCommon(
-            n_blocks_up=self.config.n_layers_in_block,
             blocks_config=BottomUpBlocksConfig(
                 n_residual_conv_cells=self.config.n_residual_conv_cells_in_layer,
                 res_conv_common=ResConvCellCommonInBlocksUp(
@@ -207,6 +207,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
 
         self.bottom_up = BottomUp(
             blocks_common_config=bottom_up_common_config,
+            n_layers_in_block=self.config.n_layers_in_block,
             blocks_channels=self.config.blocks_channels_bottom_up,
             blocks_stride=self.config.blocks_strides_bottom_up,
             blocks_skip_channels=self.config.blocks_skip_channels,
@@ -215,7 +216,6 @@ class EffVDVAE(DescribedImageGenerativeModel):
         )
 
         top_down_common_config = TopDownBlocksCommon(
-            n_blocks_down=self.config.n_layers_in_block,
             blocks_config=TopDownBlocksConfig(
                 n_residual_conv_cells=self.config.n_residual_conv_cells_in_layer,
                 res_conv_common=ResConvCellCommonInBlockDown(
@@ -232,6 +232,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
         self.top_down = TopDown(
             image_shape=self.config.image_shape,
             blocks_common_config=top_down_common_config,
+            n_layers_in_block=self.config.n_layers_in_block[::-1],
             blocks_channels=self.config.blocks_channels_bottom_up[::-1],
             blocks_stride=self.config.blocks_strides_bottom_up[::-1],
             blocks_skip_channels=self.config.blocks_skip_channels[::-1],

@@ -54,7 +54,7 @@ def main():
 
     eff_vdvae = EffVDVAE(EffVDVAEConfig(
         image_shape=image_shape,
-        n_layers_in_block=2,
+        n_layers_in_block=(2, 2, 2, 2),
         blocks_channels_bottom_up=(48, 96, 160, 224),
         blocks_strides_bottom_up=(2, 2, 2, 2),
         blocks_skip_channels=(48, 96, 160, 224),

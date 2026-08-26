@@ -102,7 +102,6 @@ class TopDownBlock(nn.Module):
 
 @dataclass(kw_only=True)
 class TopDownBlocksCommon:
-    n_blocks_down: int
     blocks_config: TopDownBlocksConfig
 
 
@@ -111,6 +110,7 @@ class TopDown(nn.Module):
         self,
         image_shape: ImageShape,
         blocks_common_config: TopDownBlocksCommon,
+        n_layers_in_block: tuple[int, ...],
         blocks_channels: tuple[int, ...],
         blocks_stride: tuple[int, ...],
         blocks_skip_channels: tuple[int, ...],
@@ -153,12 +153,14 @@ class TopDown(nn.Module):
         blocks_in_channels = blocks_channels[0:1] + blocks_channels[:-1]
 
         for (
+            n_layers,
             block_in_channels, 
             block_out_channels, 
             block_stride,
             block_skip_channels,
             block_latent_variates,
         ) in zip(
+            n_layers_in_block,
             blocks_in_channels,
             blocks_channels,
             blocks_stride,
@@ -170,7 +172,7 @@ class TopDown(nn.Module):
                 TopDownBlock(
                     in_channels=block_in_channels,
                     out_channels=block_out_channels,
-                    n_blocks_down=blocks_common_config.n_blocks_down,
+                    n_blocks_down=n_layers,
                     blocks_config=blocks_common_config.blocks_config,
                     stride=block_stride,
                     skip_channels=block_skip_channels,

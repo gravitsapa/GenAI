@@ -62,7 +62,6 @@ class BottomUpBlock(nn.Module):
 
 @dataclass(kw_only=True)
 class BottomUpBlocksCommon:
-    n_blocks_up: int
     blocks_config: BottomUpBlocksConfig
 
 
@@ -70,6 +69,7 @@ class BottomUp(nn.Module):
     def __init__(
         self,
         blocks_common_config: BottomUpBlocksCommon,
+        n_layers_in_block: tuple[int, ...],
         blocks_channels: tuple[int, ...],
         blocks_stride: tuple[int, ...],
         blocks_skip_channels: tuple[int, ...],
@@ -97,7 +97,14 @@ class BottomUp(nn.Module):
 
         blocks_out_channels = blocks_channels[1:] + blocks_channels[-1:]
 
-        for block_in_channels, block_out_channels, block_stride, block_skip_channels in zip(
+        for (
+            n_layers,
+            block_in_channels, 
+            block_out_channels, 
+            block_stride, 
+            block_skip_channels
+        ) in zip(
+            n_layers_in_block,
             blocks_channels,
             blocks_out_channels,
             blocks_stride,
@@ -108,7 +115,7 @@ class BottomUp(nn.Module):
                 BottomUpBlock(
                     in_channels=block_in_channels,
                     out_channels=block_out_channels,
-                    n_blocks_up=blocks_common_config.n_blocks_up,
+                    n_blocks_up=n_layers,
                     blocks_config=blocks_common_config.blocks_config,
                     stride=block_stride,
                     skip_channels=block_skip_channels,
