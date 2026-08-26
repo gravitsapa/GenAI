@@ -34,7 +34,7 @@ def main():
 
     image_shape = (64, 64)
     num_epochs = 400
-    warmup_epochs = 10
+    warmup_epochs = 40
 
     augmentation_builder = AugmentationBuilder(AugmentationsConfig(
         random_crop_scale=None,

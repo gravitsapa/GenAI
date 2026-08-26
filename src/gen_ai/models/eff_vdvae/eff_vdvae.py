@@ -176,15 +176,6 @@ class EffVDVAEConfig:
         )
 
 
-@dataclass
-class EffVDVAELossData:
-    reconstruction_loss: float
-    kl_divergence: float
-
-    def to_dict(self) -> dict[str, float]:
-        return asdict(self)
-
-
 class EffVDVAE(DescribedImageGenerativeModel):
     def __init__(
         self,
@@ -381,6 +372,16 @@ class EffVDVAELossConfig:
     beta: float | ScheduledParam[float]
 
 
+@dataclass
+class EffVDVAELossData:
+    reconstruction_loss: float
+    kl_divergence: float
+    beta: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
 class EffVDVAELoss(ContainingConfiguration, nn.Module):
     def __init__(
         self,
@@ -450,4 +451,5 @@ class EffVDVAELoss(ContainingConfiguration, nn.Module):
         return loss, EffVDVAELossData(
             reconstruction_loss=nll.detach().cpu().item(),
             kl_divergence=kl_div.detach().cpu().item(),
+            beta=beta,
         )

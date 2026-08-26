@@ -1,7 +1,10 @@
+from math import isfinite
+from numbers import Integral, Real
 from typing import Any, Generic, TypeVar
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from gen_ai.exceptions import ConfigurationError, require
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
 
 class ParamScheduler:
@@ -16,6 +19,14 @@ class ParamScheduler:
 
     def get_epoch(self) -> int:
         return self._epoch_now
+
+    def state_dict(self) -> dict[str, int]:
+        return {
+            "epoch_now": self._epoch_now,
+        }
+
+    def load_state_dict(self, state_dict: dict[str, int]) -> None:
+        self._epoch_now = state_dict["epoch_now"]
 
 T = TypeVar('T')
 
@@ -39,6 +50,41 @@ class LinearFloatSchemeConfig:
     end_step: int
     begin_value: float
     end_value: float
+
+    def __post_init__(self) -> None:
+        require(
+            isinstance(self.begin_step, Integral) and not isinstance(self.begin_step, bool),
+            ConfigurationError,
+            f"begin_step must be an integer, got {self.begin_step!r}",
+        )
+        require(
+            isinstance(self.end_step, Integral) and not isinstance(self.end_step, bool),
+            ConfigurationError,
+            f"end_step must be an integer, got {self.end_step!r}",
+        )
+        require(
+            self.begin_step >= 1,
+            ConfigurationError,
+            f"begin_step must be positive, got {self.begin_step}",
+        )
+        require(
+            self.end_step > self.begin_step,
+            ConfigurationError,
+            lambda: (
+                "end_step must be greater than begin_step, got "
+                f"begin_step={self.begin_step}, end_step={self.end_step}"
+            ),
+        )
+        require(
+            isinstance(self.begin_value, Real) and isfinite(self.begin_value),
+            ConfigurationError,
+            f"begin_value must be a finite real number, got {self.begin_value!r}",
+        )
+        require(
+            isinstance(self.end_value, Real) and isfinite(self.end_value),
+            ConfigurationError,
+            f"end_value must be a finite real number, got {self.end_value!r}",
+        )
 
 
 class LinearFloatScheme(ContainingConfiguration, Scheme[float]):

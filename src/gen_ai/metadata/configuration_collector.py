@@ -45,10 +45,6 @@ class ContainingConfiguration:
         if self.config is not None:
             metadata_dict["config"] = asdict(self.config)
 
-            for key in metadata_dict["config"]:
-                if isinstance(metadata_dict["config"][key], ContainingConfiguration):
-                    metadata_dict["config"][key] = metadata_dict["config"][key].get_metadata_dict()
-
         attributes_metadata = self._get_attributes_metadata()
         if attributes_metadata:
             metadata_dict["attributes"] = attributes_metadata

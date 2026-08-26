@@ -145,6 +145,7 @@ class Trainer(ContainingConfiguration):
                 "model_state_dict": self.model.state_dict(),
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "scheduler_state_dict": self.scheduler.state_dict(),
+                "param_scheduler_state_dict": self.param_scheduler.state_dict(),
                 "metrics_history": metrics_history,
             }
             self.logger.save_last_checkpoint(checkpoint)
