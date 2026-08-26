@@ -27,15 +27,14 @@ def diag_normal_kl_divergence(
 
 def logistic_mixture_log_tensor(
     input_tensor: Tensor, # B, H, W
-    logit_probs: Tensor, # B, M, H, W
     means: Tensor, # B, M, H, W
     scales: Tensor, # B, M, H, W
 ):
-    B, M, H, W = logit_probs.size()
+    B, M, H, W = means.size()
 
     input_expanded = input_tensor.unsqueeze(1).expand(-1, M, -1, -1)
     y = (input_expanded - means) / scales
 
-    l = logit_probs -y - torch.log(scales) - 2 * F.softplus(-y)
+    l = -y - torch.log(scales) - 2 * F.softplus(-y)
 
     return l

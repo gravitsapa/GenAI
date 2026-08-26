@@ -397,21 +397,19 @@ class EffVDVAE(DescribedImageGenerativeModel):
         scalar = input_tensor.numel()
 
         nll = -torch.sum(torch.logsumexp(
+            log_pi +
             logistic_mixture_log_tensor(
                 input_tensor=input_tensor[:, 0, :, :],
-                logit_probs=log_pi,
                 means=means0,
                 scales=scales[:, 0, :, :, :],
             ) + 
             logistic_mixture_log_tensor(
                 input_tensor=input_tensor[:, 1, :, :],
-                logit_probs=log_pi,
                 means=means1,
                 scales=scales[:, 1, :, :, :],
             ) + 
             logistic_mixture_log_tensor(
                 input_tensor=input_tensor[:, 2, :, :],
-                logit_probs=log_pi,
                 means=means2,
                 scales=scales[:, 2, :, :, :],
             ),
