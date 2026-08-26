@@ -9,22 +9,32 @@ from torch import Tensor
 from gen_ai.models.common import ModuleFactory
 
 
-def conv2d(
-    in_channels: int,
-    out_channels: int,
-    kernel_size: int | tuple[int, int],
-    stride: int=1,
-    padding: int | str = 'same',
-    bias: bool=True,
-) -> nn.Conv2d:
-    return nn.Conv2d(
-        in_channels=in_channels,
-        out_channels=out_channels,
-        kernel_size=kernel_size,
-        stride=stride,
-        bias=bias,
-        padding=padding,
-    )
+class Conv2dWithZeroBias(nn.Conv2d):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int | tuple[int, int],
+        stride: int=1,
+        padding: int | str = 'same',
+        bias: bool=True,
+        **kwargs,
+    ):
+        super().__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=bias,
+            padding=padding,
+            **kwargs,
+        )
+
+    def reset_parameters(self) -> None:
+        with torch.no_grad():
+            nn.init.xavier_uniform_(self.weight)
+            if self.bias is not None:
+                nn.init.zeros_(self.bias)
 
 
 class ResidualConvCell(nn.Module):
@@ -49,7 +59,7 @@ class ResidualConvCell(nn.Module):
         self.convs = nn.Sequential()
         self.convs.extend([
             non_linearity(),
-            conv2d(
+            Conv2dWithZeroBias(
                 in_channels=in_channels,
                 out_channels=bottleneck_channels,
                 kernel_size=1 if use_1x1_cells else 3,
@@ -59,14 +69,14 @@ class ResidualConvCell(nn.Module):
         for _ in range(n_layers):
             self.convs.extend([
                 non_linearity(),
-                conv2d(
+                Conv2dWithZeroBias(
                     in_channels=bottleneck_channels,
                     out_channels=bottleneck_channels,
                     kernel_size=kernel_size,
                 )
             ])
 
-        last_conv = conv2d(
+        last_conv = Conv2dWithZeroBias(
             in_channels=bottleneck_channels,
             out_channels=out_channels,
             kernel_size=1 if use_1x1_cells else 3,
@@ -81,7 +91,7 @@ class ResidualConvCell(nn.Module):
         if in_channels == out_channels:
             self.residual = nn.Identity()
         else:
-            self.residual = conv2d(
+            self.residual = Conv2dWithZeroBias(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=1

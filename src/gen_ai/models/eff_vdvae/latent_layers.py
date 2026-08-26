@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from gen_ai.models.eff_vdvae.cnn import conv2d
+from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias
 
 
 class GaussianLatentLayer(nn.Module):
@@ -20,7 +20,7 @@ class GaussianLatentLayer(nn.Module):
     ):
         super().__init__()
 
-        self.projection = conv2d(
+        self.projection = Conv2dWithZeroBias(
             in_channels=in_channels,
             out_channels=2 * num_variates,
             kernel_size=1,

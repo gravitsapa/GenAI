@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from gen_ai.models.common import ModuleFactory, get_model_device
-from gen_ai.models.eff_vdvae.cnn import conv2d, ResidualConvCell
+from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias, ResidualConvCell
 from gen_ai.models.eff_vdvae.latent_layers import GaussianLatentLayer
 
 
@@ -32,14 +32,14 @@ class Upsample(nn.Module):
         super().__init__()
 
         self.ops = nn.Sequential(*[
-            conv2d(
+            Conv2dWithZeroBias(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=1,
             ),
             non_linearity(),
             Interpolate(stride),
-            conv2d(
+            Conv2dWithZeroBias(
                 in_channels=out_channels,
                 out_channels=out_channels,
                 kernel_size=1,
@@ -132,7 +132,7 @@ class BlockDown(nn.Module):
             num_variates=latent_variates,
         )
 
-        self.z_projection = conv2d(
+        self.z_projection = Conv2dWithZeroBias(
             in_channels=latent_variates,
             out_channels=out_channels,
             kernel_size=1,

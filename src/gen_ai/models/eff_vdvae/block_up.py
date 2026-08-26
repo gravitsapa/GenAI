@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from gen_ai.models.common import ModuleFactory
-from gen_ai.models.eff_vdvae.cnn import conv2d, ResidualConvCell
+from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias, ResidualConvCell
 
 
 class Downsample(nn.Module):
@@ -20,7 +20,7 @@ class Downsample(nn.Module):
     ):
         super().__init__()
 
-        self.conv = conv2d(
+        self.conv = Conv2dWithZeroBias(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=stride,
@@ -74,7 +74,7 @@ class BlockUp(nn.Module):
             if skip_channels is None:
                 skip_channels = in_channels
 
-            self.skip_projection = conv2d(
+            self.skip_projection = Conv2dWithZeroBias(
                 in_channels=in_channels,
                 out_channels=skip_channels,
                 kernel_size=1,

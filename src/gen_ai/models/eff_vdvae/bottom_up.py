@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from gen_ai.exceptions import require, ModelShapeError
-from gen_ai.models.eff_vdvae.cnn import conv2d
+from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias
 from gen_ai.models.eff_vdvae.block_up import BlockUp, ResConvCellCommonInBlocksUp
 
 
@@ -87,7 +87,7 @@ class BottomUp(nn.Module):
             ),
         )
 
-        self.input_conv = conv2d(
+        self.input_conv = Conv2dWithZeroBias(
             in_channels=in_channels,
             out_channels=blocks_channels[0],
             kernel_size=in_conv_kernel,

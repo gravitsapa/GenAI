@@ -10,7 +10,7 @@ from torch import Tensor
 
 from gen_ai.exceptions import require, ModelShapeError
 from gen_ai.models.generative import ImageShape
-from gen_ai.models.eff_vdvae.cnn import conv2d
+from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias
 from gen_ai.models.eff_vdvae.block_down import BlockDown, ResConvCellCommonInBlockDown
 
 
@@ -178,7 +178,7 @@ class TopDown(nn.Module):
                 )
             )
 
-        self.output_conv = conv2d(
+        self.output_conv = Conv2dWithZeroBias(
             in_channels=blocks_channels[-1],
             out_channels=out_channels,
             kernel_size=out_conv_kernel,
