@@ -4,7 +4,7 @@ from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
 from gen_ai.models.eff_vdvae.eff_vdvae import EffVDVAE, EffVDVAEConfig
-from gen_ai.training.optimizer import DescribedAdam, AdamConfig
+from gen_ai.training.optimizer import DescribedAdamax, AdamaxConfig
 from gen_ai.training.scheduler import (
     DescribedCosineAnnealingLR,
     CosineAnnealingLRConfig,
@@ -64,9 +64,9 @@ def main():
         n_conv_layers_in_residual=2,
     )).to(device)
 
-    optimizer = DescribedAdam(
+    optimizer = DescribedAdamax(
         eff_vdvae.parameters(),
-        AdamConfig(
+        AdamaxConfig(
             lr=2e-4,
         )
     )
@@ -93,7 +93,7 @@ def main():
         ]
     )
 
-    logger = Logger("eff_vdvae_64")
+    logger = Logger("eff_vdvae_64_2.0")
 
     trainer = Trainer(
         eff_vdvae,

@@ -3,7 +3,7 @@ from typing import Any
 
 import torch
 from torch.optim.optimizer import Optimizer
-from torch.optim import Adam, AdamW
+from torch.optim import Adam, AdamW, Adamax
 from torch.optim.optimizer import ParamsT
 
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
@@ -24,6 +24,20 @@ class DescribedAdam(DescribedOptimizer, Adam):
         self, 
         params: ParamsT,
         config: AdamConfig,
+    ):
+        super().__init__(config=config, params=params, **asdict(config))
+
+
+@dataclass(frozen=True, kw_only=True)
+class AdamaxConfig:
+    lr: float
+
+
+class DescribedAdamax(DescribedOptimizer, Adamax):
+    def __init__(
+        self,
+        params: ParamsT,
+        config: AdamaxConfig,
     ):
         super().__init__(config=config, params=params, **asdict(config))
 
