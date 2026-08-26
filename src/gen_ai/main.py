@@ -3,7 +3,10 @@ import torch
 from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
 from gen_ai.data.dataloader import DescribedImageDataLoader, DataloaderConfig
-from gen_ai.models.eff_vdvae.eff_vdvae import EffVDVAE, EffVDVAEConfig
+from gen_ai.models.eff_vdvae.eff_vdvae import (
+    EffVDVAE, EffVDVAEConfig, 
+    EffVDVAELoss, EffVDVAELossConfig
+)
 from gen_ai.training.optimizer import DescribedAdamax, AdamaxConfig
 from gen_ai.training.scheduler import (
     DescribedCosineAnnealingLR,
@@ -14,6 +17,12 @@ from gen_ai.training.scheduler import (
 )
 from gen_ai.training.trainer import Trainer, TrainerConfig
 from gen_ai.training.logger import Logger
+from gen_ai.training.param_scheduler import (
+    ParamScheduler, 
+    ScheduledParam, 
+    LinearFloatScheme, 
+    LinearFloatSchemeConfig
+)
 
 
 def main():
@@ -95,13 +104,33 @@ def main():
 
     logger = Logger("eff_vdvae_64_2.0")
 
+    param_scheduler = ParamScheduler()
+
+    loss = EffVDVAELoss(
+        model=eff_vdvae,
+        config=EffVDVAELossConfig(
+            beta=ScheduledParam(
+                param_scheduler=param_scheduler,
+                scheme=LinearFloatScheme(
+                    LinearFloatSchemeConfig(
+                        begin_step=20,
+                        end_step=40,
+                        begin_value=1e-4,
+                        end_value=1.,
+                    )
+                )
+            )
+        )
+    )
+
     trainer = Trainer(
         eff_vdvae,
         data_loader,
-        eff_vdvae.compute_loss,
+        loss,
         optimizer,
         logger,
         scheduler,
+        param_scheduler,
         TrainerConfig(
             num_epochs=num_epochs,
             log_every_epoch=20

@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from gen_ai.metadata.configuration_collector import ContainingConfiguration
 from gen_ai.exceptions import ConfigurationError, ModelShapeError, require
 from gen_ai.models.common import get_model_device, one_hot
 from gen_ai.models.generative import DescribedImageGenerativeModel, ImageShape
@@ -22,6 +23,7 @@ from gen_ai.models.eff_vdvae.bottom_up import (
     BottomUpBlocksConfig,
     ResConvCellCommonInBlocksUp
 )
+from gen_ai.training.param_scheduler import ScheduledParam, get_param
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -42,6 +44,8 @@ class EffVDVAEConfig:
     n_conv_layers_in_residual: int = 2
     kernel_size: int = 3
     bottleneck_channels_ratio: float = 0.25
+    smoothing_beta: float = np.log(2)
+    min_scale: float = np.exp(-250)
 
     def __post_init__(self) -> None:
         require(
@@ -262,8 +266,6 @@ class EffVDVAE(DescribedImageGenerativeModel):
     def _parse_logits(
         self,
         logits: Tensor,
-        smoothing_beta: float = np.log(2),
-        min_scale: float = np.exp(-250),
     ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         device = get_model_device(self)
 
@@ -299,10 +301,10 @@ class EffVDVAE(DescribedImageGenerativeModel):
             l[:, :, 2 * n_mixtures: 3 * n_mixtures, :, :]
         )  # B, C, M, H, W
 
-        softplus = nn.Softplus(beta=smoothing_beta)
+        softplus = nn.Softplus(beta=self.config.smoothing_beta)
         scales = torch.maximum(
             softplus(scales_logits), 
-            torch.as_tensor(min_scale, device=device),
+            torch.as_tensor(self.config.min_scale, device=device),
         )
 
         return logit_probs, model_means, scales, model_coeffs
@@ -362,7 +364,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
         )  # B, 1, H, W
 
         x = torch.cat([x0, x1, x2], dim=1)  # B, C, H, W
-        return x 
+        return x
 
     @torch.inference_mode()
     def sample(self, batch_size, temperature=1.): 
@@ -373,15 +375,29 @@ class EffVDVAE(DescribedImageGenerativeModel):
 
         return self._sample_from_logits(logits, temperature=temperature)
 
-    def compute_loss(
+
+@dataclass(frozen=True, kw_only=True)
+class EffVDVAELossConfig:
+    beta: float | ScheduledParam[float]
+
+
+class EffVDVAELoss(ContainingConfiguration, nn.Module):
+    def __init__(
+        self,
+        model: EffVDVAE,
+        config: EffVDVAELossConfig,
+    ):
+        super().__init__(config=config)
+        self.model = model
+
+    def forward(
         self,
         input_tensor: Tensor,
         forward_output: tuple[Tensor, list[tuple[Tensor, Tensor]], list[tuple[Tensor, Tensor]]],
-        beta: float = 1.,
     ) -> tuple[Tensor, EffVDVAELossData]:
         logits, posterior_params_list, prior_params_list = forward_output
 
-        logit_probs, model_means, scales, model_coeffs = self._parse_logits(logits)
+        logit_probs, model_means, scales, model_coeffs = self.model._parse_logits(logits)
         log_pi = F.log_softmax(logit_probs, dim=1)
 
         means0 = model_means[:, 0, :, :, :]
@@ -428,6 +444,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
 
         kl_div = torch.sum(kl_div_list) / scalar
 
+        beta = get_param(self.config.beta)
         loss = nll + beta * kl_div
 
         return loss, EffVDVAELossData(

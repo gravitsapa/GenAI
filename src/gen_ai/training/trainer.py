@@ -13,6 +13,7 @@ from gen_ai.data.dataloader import DescribedImageDataLoader
 from gen_ai.data.datasets import DescribedImageDataset
 from gen_ai.training.optimizer import DescribedOptimizer
 from gen_ai.training.scheduler import DescribedScheduler
+from gen_ai.training.param_scheduler import ParamScheduler
 from gen_ai.models.common import get_model_device
 from gen_ai.models.generative import DescribedImageGenerativeModel
 from gen_ai.training.logger import Logger
@@ -48,6 +49,7 @@ class Trainer(ContainingConfiguration):
         optimizer: DescribedOptimizer,
         logger: Logger,
         scheduler: DescribedScheduler,
+        param_scheduler: ParamScheduler,
         config: TrainerConfig,
     ):
         super().__init__(config=config)
@@ -58,6 +60,7 @@ class Trainer(ContainingConfiguration):
         self.optimizer = optimizer
         self.logger = logger
         self.scheduler = scheduler
+        self.param_scheduler = param_scheduler
 
 
     def _train_one_epoch(self) -> dict[str, float]:
@@ -135,6 +138,7 @@ class Trainer(ContainingConfiguration):
             )
 
             self.scheduler.step()
+            self.param_scheduler.step()
 
             checkpoint = {
                 "epoch": epoch_num,
