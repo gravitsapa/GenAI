@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, Optional
 from dataclasses import dataclass, asdict
 
@@ -27,6 +27,7 @@ class TrainerConfig:
     eval_and_save_every_step: int
     gradient_skip_threshold: float
     collect_metrics_every_step: int
+    resume_from_checkpoint: Path | None = None
 
     def __post_init__(self) -> None:
         require(
@@ -44,6 +45,14 @@ class TrainerConfig:
             ConfigurationError,
             f"collect_metrics_every_step must be positive, got {self.collect_metrics_every_step}",
         )
+
+        if self.resume_from_checkpoint is not None:
+            checkpoint_path = Path(self.resume_from_checkpoint)
+            require(
+                checkpoint_path.is_file(),
+                ConfigurationError,
+                f"resume_from_checkpoint must point to an existing checkpoint file, got {checkpoint_path}",
+            )
 
 
 class Trainer(ContainingConfiguration):
@@ -67,6 +76,89 @@ class Trainer(ContainingConfiguration):
         self.logger = logger
         self.scheduler = scheduler
         self.param_scheduler = param_scheduler
+
+    def _load_checkpoint(
+        self,
+        device: torch.device,
+    ) -> tuple[int, list[dict], list[int]]:
+        if self.config.resume_from_checkpoint is None:
+            return 0, [], []
+
+        checkpoint_path = Path(self.config.resume_from_checkpoint)
+        try:
+            try:
+                checkpoint = torch.load(
+                    checkpoint_path,
+                    map_location=device,
+                    weights_only=False,
+                )
+            except TypeError:
+                # weights_only was introduced after older supported PyTorch releases.
+                checkpoint = torch.load(checkpoint_path, map_location=device)
+        except (OSError, RuntimeError, ValueError) as error:
+            raise TrainingError(
+                f"could not load checkpoint from {checkpoint_path}: {error}"
+            ) from error
+
+        require(
+            isinstance(checkpoint, Mapping),
+            TrainingError,
+            f"checkpoint at {checkpoint_path} must be a mapping",
+        )
+
+        required_keys = {
+            "step",
+            "model_state_dict",
+            "optimizer_state_dict",
+            "scheduler_state_dict",
+            "param_scheduler_state_dict",
+        }
+        missing_keys = required_keys - checkpoint.keys()
+        require(
+            not missing_keys,
+            TrainingError,
+            lambda: (
+                f"checkpoint at {checkpoint_path} is missing required keys: "
+                f"{', '.join(sorted(missing_keys))}"
+            ),
+        )
+
+        checkpoint_step = checkpoint["step"]
+        require(
+            isinstance(checkpoint_step, int) and not isinstance(checkpoint_step, bool),
+            TrainingError,
+            f"checkpoint step must be an integer, got {checkpoint_step!r}",
+        )
+        require(
+            0 <= checkpoint_step < self.config.num_steps,
+            TrainingError,
+            lambda: (
+                f"checkpoint step {checkpoint_step} must be in [0, {self.config.num_steps}) "
+                "to continue training"
+            ),
+        )
+
+        try:
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            self.param_scheduler.load_state_dict(checkpoint["param_scheduler_state_dict"])
+        except (RuntimeError, ValueError, KeyError) as error:
+            raise TrainingError(
+                f"checkpoint at {checkpoint_path} is incompatible with the current training setup: {error}"
+            ) from error
+
+        metrics_history = checkpoint.get("metrics_history", [])
+        steps_history = checkpoint.get("steps_history", [])
+        if not isinstance(metrics_history, list) or not isinstance(steps_history, list):
+            raise TrainingError(
+                f"checkpoint at {checkpoint_path} contains invalid metrics history"
+            )
+        if len(metrics_history) != len(steps_history):
+            metrics_history, steps_history = [], []
+
+        print(f"Resumed training from {checkpoint_path} at step {checkpoint_step}")
+        return checkpoint_step, metrics_history, steps_history
 
     def _skip_gradient_correctness(self) -> bool:
         parameters = [p for p in self.model.parameters() if p.grad is not None and p.requires_grad]
@@ -147,14 +239,13 @@ class Trainer(ContainingConfiguration):
 
         sampler = Sampler(self.model)
         device = get_model_device(self.model)
+        checkpoint_step, metrics_history, steps_history = self._load_checkpoint(device)
         self.model.train()
 
         metrics_accumulator = WeightedMeanMetrics()
-        metrics_history: list[dict] = []
-        steps_history: list[int] = []
 
         steps_bar = trange(
-            1,
+            checkpoint_step + 1,
             self.config.num_steps + 1,
             desc="Step",
             leave=True,
@@ -188,6 +279,7 @@ class Trainer(ContainingConfiguration):
                     "scheduler_state_dict": self.scheduler.state_dict(),
                     "param_scheduler_state_dict": self.param_scheduler.state_dict(),
                     "metrics_history": metrics_history,
+                    "steps_history": steps_history,
                 }
                 self.logger.save_last_checkpoint(checkpoint)
 

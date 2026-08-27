@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from pathlib import Path
 
 from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
 from gen_ai.data.datasets import AnimeFaces256, ImageDatasetConfig
@@ -42,6 +43,8 @@ def main():
     warmup_steps = 2000
     beta_warmup_steps = 10000
     decay_begin_step = 100000
+
+    resume_from_checkpoint: Path | None = None
 
     augmentation_builder = AugmentationBuilder(AugmentationsConfig(
         random_crop_scale=None,
@@ -153,10 +156,10 @@ def main():
             eval_and_save_every_step=num_steps // 100,
             collect_metrics_every_step=num_steps // 10000,
             gradient_skip_threshold=800,
+            resume_from_checkpoint=resume_from_checkpoint,
         ),
     )
 
     trainer.train_loop()
 
     print("Done")
-    
