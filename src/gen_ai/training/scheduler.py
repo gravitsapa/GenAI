@@ -2,7 +2,7 @@ from dataclasses import dataclass, asdict
 from typing import Sequence
 
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR, LRScheduler, SequentialLR, LinearLR
+from torch.optim.lr_scheduler import ConstantLR, CosineAnnealingLR, LRScheduler, SequentialLR, LinearLR
 from torch.optim import Optimizer
 
 from gen_ai.metadata.configuration_collector import ContainingConfiguration
@@ -39,6 +39,21 @@ class DescribedLinearLR(DescribedScheduler, LinearLR):
         self, 
         optimizer: Optimizer,
         config: LinearLRConfig,
+    ):
+        super().__init__(config=config, optimizer=optimizer, **asdict(config))
+
+
+@dataclass(frozen=True, kw_only=True)
+class ConstantLRConfig:
+    total_iters: int
+    factor: float = 1.
+
+
+class DescribedConstantLR(DescribedScheduler, ConstantLR):
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        config: ConstantLRConfig,
     ):
         super().__init__(config=config, optimizer=optimizer, **asdict(config))
 

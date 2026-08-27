@@ -63,9 +63,9 @@ class LinearFloatSchemeConfig:
             f"end_step must be an integer, got {self.end_step!r}",
         )
         require(
-            self.begin_step >= 1,
+            self.begin_step >= 0,
             ConfigurationError,
-            f"begin_step must be positive, got {self.begin_step}",
+            f"begin_step must be >= 0, got {self.begin_step}",
         )
         require(
             self.end_step > self.begin_step,

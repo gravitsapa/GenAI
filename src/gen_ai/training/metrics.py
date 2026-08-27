@@ -28,3 +28,7 @@ class WeightedMeanMetrics:
             name: self._sums[name] / self._weights[name]
             for name in self._sums
         }
+
+    def clear(self) -> None:
+        self._sums = defaultdict(float)
+        self._weights = defaultdict(int)

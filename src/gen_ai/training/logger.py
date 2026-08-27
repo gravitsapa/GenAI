@@ -66,12 +66,13 @@ class Logger:
 
     def save_metrics_plot(
         self,
+        steps_history: list[int],
         metrics_history: list[dict],
-        epoch_num: int,
+        step_num: int,
     ):
-        plot_filename = self.plots_dir / f"{self.plot_name}_epoch_{epoch_num:04}.png"
-        epochs = pandas.Series(range(1, len(metrics_history) + 1), name="epoch")
-        history_dataframe = pandas.DataFrame(metrics_history, index=epochs)
+        plot_filename = self.plots_dir / f"{self.plot_name}_step_{step_num:04}.png"
+        steps = pandas.Series(steps_history, name="step")
+        history_dataframe = pandas.DataFrame(metrics_history, index=steps)
 
         fig, axs = plt.subplots(figsize=self.plots_figsize)
         axs.grid(True)
@@ -84,9 +85,9 @@ class Logger:
     def save_checkpoint(
         self,
         checkpoint: dict,
-        epoch_num: int,
+        step_num: int,
     ):
-        checkpoint_filename = self.checkpoints_dir / f"{self.checkpoint_name}_epoch_{epoch_num:04}.pt"
+        checkpoint_filename = self.checkpoints_dir / f"{self.checkpoint_name}_step_{step_num:04}.pt"
 
         torch.save(checkpoint, checkpoint_filename)
 
@@ -103,9 +104,9 @@ class Logger:
     def save_samples(
         self,
         fig: Figure,
-        epoch_num: int,
+        step_num: int,
     ):
-        samples_filename = self.samples_dir / f"{self.sample_name}_epoch_{epoch_num:04}.png"
+        samples_filename = self.samples_dir / f"{self.sample_name}_step_{step_num:04}.png"
 
         fig.savefig(samples_filename)
         plt.close(fig)
