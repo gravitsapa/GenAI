@@ -24,6 +24,7 @@ class TopDownBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
+        output_shape: ImageShape,
         n_blocks_down: int,
         blocks_config: TopDownBlocksConfig,
         stride: int,
@@ -39,6 +40,7 @@ class TopDownBlock(nn.Module):
         self.upsample_block = BlockDown(
             in_channels=in_channels,
             out_channels=out_channels,
+            output_shape=output_shape,
             n_residual_conv_cells=blocks_config.n_residual_conv_cells,
             residual_conv_cell_config=blocks_config.res_conv_common,
             skip_channels=skip_channels,
@@ -50,6 +52,7 @@ class TopDownBlock(nn.Module):
             BlockDown(
                 in_channels=out_channels,
                 out_channels=out_channels,
+                output_shape=output_shape,
                 n_residual_conv_cells=blocks_config.n_residual_conv_cells,
                 residual_conv_cell_config=blocks_config.res_conv_common,
                 skip_channels=skip_channels,
@@ -140,8 +143,9 @@ class TopDown(nn.Module):
             ),
         )
 
-        top_latent_shape = (1, blocks_channels[0]) + \
-            tuple(np.array(image_shape, dtype=int) // stride_prod)
+        latent_image_shape = tuple(np.array(image_shape, dtype=int) // stride_prod)
+
+        top_latent_shape = (1, blocks_channels[0]) + latent_image_shape
         self.trainable_h = torch.nn.Parameter(
             data=torch.empty(top_latent_shape),
             requires_grad=True
@@ -152,6 +156,14 @@ class TopDown(nn.Module):
 
         blocks_in_channels = blocks_channels[0:1] + blocks_channels[:-1]
 
+        output_shapes = map(
+            tuple, 
+            [
+                np.array(latent_image_shape) * stride 
+                for stride in np.cumprod(blocks_stride)
+            ]
+        )
+
         for (
             n_layers,
             block_in_channels, 
@@ -159,6 +171,7 @@ class TopDown(nn.Module):
             block_stride,
             block_skip_channels,
             block_latent_variates,
+            output_shape,
         ) in zip(
             n_layers_in_block,
             blocks_in_channels,
@@ -166,12 +179,14 @@ class TopDown(nn.Module):
             blocks_stride,
             blocks_skip_channels,
             blocks_latent_variates,
+            output_shapes,
             strict=True,
         ):
             self.blocks.append(
                 TopDownBlock(
                     in_channels=block_in_channels,
                     out_channels=block_out_channels,
+                    output_shape=output_shape,
                     n_blocks_down=n_layers,
                     blocks_config=blocks_common_config.blocks_config,
                     stride=block_stride,

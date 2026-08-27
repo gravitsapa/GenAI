@@ -26,6 +26,8 @@ from gen_ai.exceptions import ConfigurationError, TrainingError, require
 class TrainerConfig:
     num_epochs: int
     log_every_epoch: int
+    gradient_skip_threshold: float
+    epoch_bar_info_every_batch: int
 
     def __post_init__(self) -> None:
         require(
@@ -62,6 +64,16 @@ class Trainer(ContainingConfiguration):
         self.scheduler = scheduler
         self.param_scheduler = param_scheduler
 
+    def _skip_gradient_correctness(self) -> bool:
+        parameters = [p for p in self.model.parameters() if p.grad is not None and p.requires_grad]
+        if len(parameters) == 0:
+            gradient_norm = torch.tensor(0.0)
+        else:
+            device = parameters[0].device
+            gradient_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), 2.0).to(device) for p in parameters]), 2.0)
+
+        skip = torch.any(torch.isnan(gradient_norm)) or gradient_norm >= self.config.gradient_skip_threshold
+        return bool(skip.cpu().item())
 
     def _train_one_epoch(self) -> dict[str, float]:
         self.model.train()
@@ -70,7 +82,9 @@ class Trainer(ContainingConfiguration):
 
         device = get_model_device(self.model)
 
-        for sample in tqdm(self.data_loader, desc="Batch", leave=False):
+        epoch_bar = tqdm(self.data_loader, desc="Batch", leave=False, mininterval=0, miniters=1,)
+
+        for batch_num, sample in enumerate(epoch_bar):
             image = sample.image.to(device)
 
             self.optimizer.zero_grad()
@@ -86,14 +100,29 @@ class Trainer(ContainingConfiguration):
 
             loss.backward()
 
-            self.optimizer.step()
+            skip_epoch = self._skip_gradient_correctness()
+            skip_metric = int(skip_epoch)
 
-            metric_values = dict(batch_loss_metrics.to_dict())
-            if "loss" in metric_values:
-                raise ValueError('"loss" is reserved for the optimized loss tensor')
+            if not skip_epoch:
+                self.optimizer.step()
 
-            metric_values["loss"] = loss.detach().item()
-            metrics_accumulator.update(metric_values, batch_size=image.shape[0])
+                metric_values = dict(batch_loss_metrics.to_dict())
+                if "loss" in metric_values:
+                    raise ValueError('"loss" is reserved for the optimized loss tensor')
+                
+                if "epochs_skipped" in metric_values:
+                    raise ValueError('"epochs_skipped" is reserved for the optimized loss tensor')
+
+                metric_values["loss"] = loss.detach().item()
+                metric_values["epochs_skipped"] = skip_metric
+                metrics_accumulator.update(metric_values, batch_size=image.shape[0])
+            else:
+                metric_values = {}
+                metric_values["epochs_skipped"] = skip_metric
+                metrics_accumulator.update(metric_values, batch_size=image.shape[0])
+
+            if (batch_num + 1) % self.config.epoch_bar_info_every_batch == 0:
+                epoch_bar.set_postfix(metrics_accumulator.compute())
 
         return metrics_accumulator.compute()
 

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from gen_ai.data.augmentations import AugmentationsConfig, AugmentationBuilder
@@ -33,8 +34,8 @@ def main():
     print(f"Running on {device}")
 
     image_shape = (64, 64)
-    num_epochs = 400
-    warmup_epochs = 40
+    num_epochs = 50
+    warmup_epochs = 4
 
     augmentation_builder = AugmentationBuilder(AugmentationsConfig(
         random_crop_scale=None,
@@ -50,7 +51,7 @@ def main():
     data_loader = DescribedImageDataLoader(
         anime_faces,
         DataloaderConfig(
-            batch_size=48,
+            batch_size=8,
             shuffle=True,
             pin_memory=device.type == "cuda",
             num_workers=2,
@@ -63,20 +64,21 @@ def main():
 
     eff_vdvae = EffVDVAE(EffVDVAEConfig(
         image_shape=image_shape,
-        n_layers_in_block=(2, 2, 2, 2),
-        blocks_channels_bottom_up=(48, 96, 160, 224),
-        blocks_strides_bottom_up=(2, 2, 2, 2),
-        blocks_skip_channels=(48, 96, 160, 224),
-        blocks_latent_variates=(8, 16, 24, 32),
+        n_layers_in_block=(2,) * 15 + (1,) * 7,
+        blocks_channels_bottom_up=(64,) * 22,
+        blocks_strides_bottom_up=(1,) * 5 + (2,) + (1,) * 4 + (2,) + (1,) * 3 + (2,) + (1,) * 3 + (2,) + (1, 4) + (1,),
+        blocks_skip_channels=(64,) * 22,
+        blocks_latent_variates=(32,) * 22,
         n_output_mixtures=10,
         n_residual_conv_cells_in_layer=1,
         n_conv_layers_in_residual=2,
-    )).to(device)
+        min_scale=np.exp(-10)
+    )).to(device)   
 
     optimizer = DescribedAdamax(
         eff_vdvae.parameters(),
         AdamaxConfig(
-            lr=2e-4,
+            lr=1e-3,
         )
     )
 
@@ -93,7 +95,7 @@ def main():
                 optimizer,
                 CosineAnnealingLRConfig(
                     T_max=num_epochs - warmup_epochs,
-                    eta_min=1e-6,
+                    eta_min=1e-4,
                 ),
             )
         ],
@@ -113,8 +115,8 @@ def main():
                 param_scheduler=param_scheduler,
                 scheme=LinearFloatScheme(
                     LinearFloatSchemeConfig(
-                        begin_step=20,
-                        end_step=40,
+                        begin_step=4,
+                        end_step=8,
                         begin_value=1e-4,
                         end_value=1.,
                     )
@@ -133,7 +135,9 @@ def main():
         param_scheduler,
         TrainerConfig(
             num_epochs=num_epochs,
-            log_every_epoch=20
+            log_every_epoch=2,
+            epoch_bar_info_every_batch=20,
+            gradient_skip_threshold=800,
         ),
     )
 

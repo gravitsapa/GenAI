@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from gen_ai.models.generative import ImageShape
 from gen_ai.models.common import ModuleFactory, get_model_device
 from gen_ai.models.eff_vdvae.cnn import Conv2dWithZeroBias, ResidualConvCell
 from gen_ai.models.eff_vdvae.latent_layers import GaussianLatentLayer
@@ -26,6 +27,7 @@ class Upsample(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
+        output_shape: ImageShape,
         stride: int,
         non_linearity: ModuleFactory=lambda: nn.LeakyReLU(negative_slope=0.1),
     ):
@@ -39,15 +41,15 @@ class Upsample(nn.Module):
             ),
             non_linearity(),
             Interpolate(stride),
-            Conv2dWithZeroBias(
-                in_channels=out_channels,
-                out_channels=out_channels,
-                kernel_size=1,
-            ),
         ])
 
+        self.scale_bias = nn.Parameter(
+            torch.zeros(size=(1, out_channels) + output_shape), 
+            requires_grad=True
+        )
+
     def forward(self, input_tensor: Tensor) -> Tensor:
-        return self.ops(input_tensor)
+        return self.ops(input_tensor) + self.scale_bias
 
 
 @dataclass(kw_only=True)
@@ -62,6 +64,7 @@ class BlockDown(nn.Module):
     def __init__(
         self,
         in_channels: int,
+        output_shape: ImageShape,
         n_residual_conv_cells: int,
         residual_conv_cell_config: ResConvCellCommonInBlockDown,
         skip_channels: int,
@@ -78,6 +81,7 @@ class BlockDown(nn.Module):
             self.resample = Upsample(
                 in_channels=in_channels,
                 out_channels=out_channels,
+                output_shape=output_shape,
                 stride=stride,
             )
         elif in_channels != out_channels:
@@ -108,7 +112,7 @@ class BlockDown(nn.Module):
             kernel_size=residual_conv_cell_config.kernel_size,
             n_layers=residual_conv_cell_config.n_layers,
             bottleneck_channels_ratio=0.5 * residual_conv_cell_config.bottleneck_channels_ratio,
-            init_scaler=1.,
+            init_scaler=residual_conv_cell_config.init_scaler,
             in_channels=out_channels + skip_channels,
             out_channels=out_channels,
         )
@@ -117,7 +121,7 @@ class BlockDown(nn.Module):
             kernel_size=residual_conv_cell_config.kernel_size,
             n_layers=residual_conv_cell_config.n_layers,
             bottleneck_channels_ratio=residual_conv_cell_config.bottleneck_channels_ratio,
-            init_scaler=1.,
+            init_scaler=residual_conv_cell_config.init_scaler,
             in_channels=out_channels,
             out_channels=2 * out_channels,  
         )

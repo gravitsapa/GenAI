@@ -96,6 +96,7 @@ class ResidualConvCell(nn.Module):
                 out_channels=out_channels,
                 kernel_size=1
             )
+            self.residual.weight.data *= init_scaler
 
     def forward(
         self,

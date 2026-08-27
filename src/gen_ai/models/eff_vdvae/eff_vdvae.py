@@ -184,9 +184,10 @@ class EffVDVAE(DescribedImageGenerativeModel):
         super().__init__(config=config)
 
         self.config = config
+        # layers_cnt = sum(latent for latent in self.config.blocks_latent_variates)
         layers_cnt = sum(n_layers + 1 for n_layers in self.config.n_layers_in_block)
 
-        init_scaler = np.sqrt(1. / float(layers_cnt))
+        self.init_scaler = np.sqrt(1. / float(layers_cnt))
 
         bottom_up_common_config = BottomUpBlocksCommon(
             blocks_config=BottomUpBlocksConfig(
@@ -194,7 +195,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
                 res_conv_common=ResConvCellCommonInBlocksUp(
                     kernel_size=self.config.kernel_size,
                     n_layers=self.config.n_conv_layers_in_residual,
-                    init_scaler=init_scaler,
+                    init_scaler=self.init_scaler,
                     bottleneck_channels_ratio=self.config.bottleneck_channels_ratio,
                 )
             )
@@ -216,7 +217,7 @@ class EffVDVAE(DescribedImageGenerativeModel):
                 res_conv_common=ResConvCellCommonInBlockDown(
                     kernel_size=self.config.kernel_size,
                     n_layers=self.config.n_conv_layers_in_residual,
-                    init_scaler=init_scaler,
+                    init_scaler=self.init_scaler,
                     bottleneck_channels_ratio=self.config.bottleneck_channels_ratio,
                 ),
             )
@@ -235,6 +236,9 @@ class EffVDVAE(DescribedImageGenerativeModel):
             out_channels=out_channels,
             out_conv_kernel=self.config.out_kernel,
         )
+
+    def _get_additional_metadata(self) -> dict | None:
+        return {"init_scaler": self.init_scaler}
 
     def forward(self, input_tensor: Tensor) -> tuple[Tensor, list[tuple[Tensor, Tensor]], list[tuple[Tensor, Tensor]]]:
         require(
