@@ -17,12 +17,13 @@ class Logger:
     def __init__(
         self,
         experiment_name: str,
+        add_datetime: bool = False,
         experiments_dir: Path = EXPERIMENTS_DIR,
         plots_figsize: tuple[int, int] = (10, 5),
     ):
         self.experiment_name = experiment_name
         self.start_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        self.experiment_name_full_name = f"{self.experiment_name}_{self.start_time}"
+        self.experiment_name_full_name = f"{self.experiment_name}_{self.start_time}" if add_datetime else self.experiment_name
         self.all_experiments_dir = experiments_dir
 
         self.plots_figsize = plots_figsize

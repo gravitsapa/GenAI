@@ -122,7 +122,13 @@ def main():
         ]
     )
 
-    logger = Logger("eff_vdvae_64_2.2")
+    if resume_from_checkpoint is None:
+        logger = Logger("eff_vdvae_64_2.2")
+    else:
+        logger = Logger(
+            experiment_name=str(resume_from_checkpoint),
+            add_datetime=False
+        )
 
     param_scheduler = ParamScheduler()
 
